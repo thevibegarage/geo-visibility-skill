@@ -1,0 +1,48 @@
+# Scheduled AI-readiness check for your own site.
+# Fork this repo (or copy this file + the scripts/ folder into any repo),
+# set the GEO_DOMAIN repository variable (Settings → Secrets and variables →
+# Actions → Variables), and get a readiness report in the Actions summary
+# every Monday — plus on demand via "Run workflow".
+
+name: AI Readiness Check
+
+on:
+  schedule:
+    - cron: "17 6 * * 1" # Mondays 06:17 UTC
+  workflow_dispatch:
+    inputs:
+      domain:
+        description: "Domain to check (e.g. example.com)"
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run AI readiness check
+        env:
+          DOMAIN: ${{ inputs.domain || vars.GEO_DOMAIN }}
+        run: |
+          if [ -z "$DOMAIN" ]; then
+            echo "::error::Set the GEO_DOMAIN repository variable or pass a domain input."
+            exit 1
+          fi
+          python3 geo-visibility/scripts/check_ai_readiness.py "$DOMAIN" \
+            --json readiness.json | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail the run on readiness failures
+        run: |
+          python3 - <<'EOF'
+          import json, sys
+          r = json.load(open("readiness.json"))
+          if r.get("unreachable"):
+              sys.exit("Site unreachable from the runner — see summary.")
+          fails = r["scores"]["fail_count"]
+          print(f"Readiness {r['scores']['technical_readiness_pct']}%, {fails} failure(s)")
+          sys.exit(1 if fails else 0)
+          EOF

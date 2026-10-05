@@ -1,6 +1,12 @@
 # GEO Visibility — a Claude Skill for Generative Engine Optimization
 
+[![Release](https://img.shields.io/github/v/release/thevibegarage/geo-visibility-skill)](https://github.com/thevibegarage/geo-visibility-skill/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+
 Audit and improve how a brand is found, cited and recommended inside **ChatGPT, Claude, Gemini, Perplexity, Copilot and Google AI Overviews** — while keeping classic SEO strong.
+
+**See what it produces → [sample audit report](examples/sample-report.md)** · Install in 30 seconds below.
 
 Built and open-sourced by [Garage Labs Technologies](https://www.garagelabstech.com), an AI transformation partner headquartered in India.
 
@@ -27,6 +33,14 @@ It also includes two standard-library Python scripts:
 **Claude Code:** copy the `geo-visibility/` folder into `~/.claude/skills/`.
 
 Then just ask: *"Why doesn't ChatGPT mention my brand?"* or *"Run an AI visibility audit on example.com."*
+
+## Run it as a GitHub Action (no Claude needed)
+
+The technical-readiness checker runs standalone. Fork this repo, set a `GEO_DOMAIN` repository variable (Settings → Secrets and variables → Actions → Variables), and [the included workflow](.github/workflows/ai-readiness.yml) checks your site every Monday — robots.txt rules for AI crawlers, WAF behavior, rendering without JavaScript, schema, sitemap, llms.txt — and fails the run if something is blocking you. Or run it locally:
+
+```bash
+python3 geo-visibility/scripts/check_ai_readiness.py yourdomain.com --paths /pricing /about
+```
 
 ## What has been tested (and what hasn't)
 
@@ -66,6 +80,14 @@ geo-visibility/
 │                             #   tracker CSV, report template
 └── evals/                    # test prompts with expected outputs
 ```
+
+## Roadmap
+
+- **v0.2** — trigger-reliability testing; outcome data from real monthly re-tests; Bing/Copilot playbook expansion
+- **v0.3** — multi-language prompt-audit templates (starting with Hindi/Hinglish); more vertical playbooks from community PRs
+- **Ongoing** — crawler and engine-behavior updates as vendors change (open an [engine-update issue](.github/ISSUE_TEMPLATE/engine-update.md) when you spot one)
+
+If this repo saved you time, a ⭐ helps other people find it — which is, fittingly, exactly how GEO works.
 
 ## Contributing
 
