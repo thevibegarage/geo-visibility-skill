@@ -1,0 +1,4 @@
+prompt_id,stage,prompt,engine,mode,run,mentioned,cited,position,sentiment,accurate,competitors,cited_domains
+P01,category,"What are the best [category] tools for [persona]?",ChatGPT,search,1,0,0,,,,CompetitorA;CompetitorB,g2.com;reddit.com
+P01,category,"What are the best [category] tools for [persona]?",Claude,search,1,0,0,,,,CompetitorA,techcrunch.com
+P01,category,"What are the best [category] tools for [persona]?",Perplexity,search,1,1,1,3,positive,1,CompetitorA;CompetitorB,yourbrand.com;g2.com

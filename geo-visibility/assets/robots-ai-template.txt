@@ -1,0 +1,76 @@
+# robots.txt starter for AI-search visibility
+# Agent names verified against vendor documentation on 2026-10-05:
+#   OpenAI:     developers.openai.com/api/docs/bots
+#   Anthropic:  support.claude.com (crawler article); IPs at claude.com/crawling/bots.json
+#   Perplexity: docs.perplexity.ai/guides/bots
+#   Google:     developers.google.com/search/docs/crawling-indexing
+# Re-verify before publishing — names get added and retired.
+#
+# NOTE on user-fetch agents: ChatGPT-User and Perplexity-User act on a live user's
+# request, and both vendors state robots.txt rules may not apply to them. Listing
+# them here is harmless, but blocking them via robots.txt is not guaranteed to work.
+
+# --- Search-index agents: ALLOW so the brand can be cited (respect robots.txt) ---
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: Claude-SearchBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+# --- User-initiated fetch agents (may ignore robots.txt; listed for clarity) ---
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: Claude-User
+Allow: /
+
+User-agent: Perplexity-User
+Allow: /
+
+# --- Training agents: owner's choice (uncomment Disallow to opt out of training).
+# Blocking these does NOT remove you from AI search answers.
+# Google-Extended controls Gemini training and grounding; Google states it does not
+# affect Google Search inclusion or ranking.
+User-agent: GPTBot
+# Disallow: /
+Allow: /
+
+User-agent: ClaudeBot
+# Disallow: /
+Allow: /
+
+User-agent: Google-Extended
+# Disallow: /
+Allow: /
+
+User-agent: CCBot
+# Disallow: /
+Allow: /
+
+# Other bulk/training scrapers many publishers choose to block (owner's choice, verify names):
+# User-agent: Bytespider
+# Disallow: /
+# User-agent: Amazonbot
+# Disallow: /
+# User-agent: Applebot-Extended
+# Disallow: /
+# User-agent: meta-externalagent
+# Disallow: /
+
+# --- Everyone else ---
+User-agent: *
+Disallow: /admin/
+Disallow: /cart/
+Disallow: /checkout/
+Disallow: /account/
+
+Sitemap: https://{{YOUR_DOMAIN}}/sitemap.xml
