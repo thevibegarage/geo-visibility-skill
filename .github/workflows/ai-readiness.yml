@@ -1,8 +1,16 @@
 # Scheduled AI-readiness check for your own site.
-# Fork this repo (or copy this file + the scripts/ folder into any repo),
+# Fork this repo (or copy this file + the geo-visibility/scripts/ folder into any repo),
 # set the GEO_DOMAIN repository variable (Settings → Secrets and variables →
 # Actions → Variables), and get a readiness report in the Actions summary
 # every Monday — plus on demand via "Run workflow".
+#
+# Notes:
+#  * GitHub does not run scheduled workflows on a fork until you open the Actions tab and enable
+#    workflows, and it pauses schedules after 60 days without repository activity.
+#  * The runner uses datacenter IPs. If your WAF challenges them, the run reports "homepage returned
+#    HTTP 403" and stops rather than producing fake findings; allowlist the runner or use a self-hosted one.
+#  * The run fails when a check fails (a refused AI crawler, missing sitemap, noindex...), when the
+#    site is unreachable and when the homepage returns an HTTP error.
 
 name: AI Readiness Check
 
@@ -31,25 +39,22 @@ jobs:
         env:
           DOMAIN: ${{ inputs.domain || vars.GEO_DOMAIN }}
           # Optional: 3-5 representative detail pages, so the check can compare what a browser, a
-          # listed crawler and unlisted AI user-fetch agents each receive (set the GEO_PATHS variable).
+          # listed crawler, unlisted AI user-fetch agents, Googlebot and Bingbot each receive (set the GEO_PATHS variable).
           PATHS: ${{ inputs.paths || vars.GEO_PATHS }}
+          # Optional: your IndexNow key, to verify the key file at https://<domain>/<key>.txt (set the GEO_INDEXNOW_KEY variable).
+          INDEXNOW_KEY: ${{ vars.GEO_INDEXNOW_KEY }}
         run: |
+          # Propagate the script's exit code through `tee` (1 = failed checks, 2 = unreachable, 3 = homepage HTTP error)
+          set -o pipefail
           if [ -z "$DOMAIN" ]; then
             echo "::error::Set the GEO_DOMAIN repository variable or pass a domain input."
             exit 1
           fi
-          # $PATHS is intentionally unquoted so it splits into separate arguments
+          args=()
+          if [ -n "$INDEXNOW_KEY" ]; then
+            args+=(--indexnow-key "$INDEXNOW_KEY")
+          fi
+          # $PATHS is intentionally unquoted so it splits into separate arguments; globbing is off so "*" stays literal
+          set -f
           python3 geo-visibility/scripts/check_ai_readiness.py "$DOMAIN" --paths $PATHS \
-            --json readiness.json | tee -a "$GITHUB_STEP_SUMMARY"
-
-      - name: Fail the run on readiness failures
-        run: |
-          python3 - <<'EOF'
-          import json, sys
-          r = json.load(open("readiness.json"))
-          if r.get("unreachable"):
-              sys.exit("Site unreachable from the runner — see summary.")
-          fails = r["scores"]["fail_count"]
-          print(f"Readiness {r['scores']['technical_readiness_pct']}%, {fails} failure(s)")
-          sys.exit(1 if fails else 0)
-          EOF
+            "${args[@]}" --json readiness.json --fail-on fail | tee -a "$GITHUB_STEP_SUMMARY"

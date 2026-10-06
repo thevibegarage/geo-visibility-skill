@@ -22,7 +22,7 @@ Pick the profile closest to the brand and apply its emphasis. The workflow in SK
 - Keep price, availability and variants consistent between site, feed and marketplaces. Mismatches get an item dropped or misquoted.
 
 ## Local and service businesses
-- Highest-leverage: Google Business Profile, reviews and owner replies, consistent NAP, local pages with services and areas, local directories, Apple Business Connect and Bing Places, community and press mentions.
+- Highest-leverage: Google Business Profile, reviews and owner replies, consistent NAP, local pages with services and areas, local directories, Apple Business Connect and Bing Places (Copilot and Bing answers draw on it; see `bing-copilot.md`), community and press mentions.
 - Prompts are location-bound ("near me", neighborhood, city). Audit with the actual city and device location settings.
 
 ## Agencies and professional services
