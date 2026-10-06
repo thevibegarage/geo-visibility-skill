@@ -4,67 +4,63 @@
 #   Anthropic:  support.claude.com (crawler article); IPs at claude.com/crawling/bots.json
 #   Perplexity: docs.perplexity.ai/guides/bots
 #   Google:     developers.google.com/search/docs/crawling-indexing
-# Re-verify before publishing — names get added and retired.
+#   Microsoft:  bing.com/webmasters (Bingbot documentation)
+# Re-verify before publishing: names get added and retired.
+#
+# HOW GROUPS WORK: a crawler obeys only the most specific group that names it. It does NOT
+# also apply the "User-agent: *" group. So every private-path rule must be repeated in every
+# group (or shared by listing several User-agent lines above one block, as below). Naming a
+# bot with only "Allow: /" would silently open /admin/, /cart/ and the rest to it. Disallow lines
+# come before "Allow: /" so parsers that use first-match order (not only longest-match) agree.
 #
 # NOTE on user-fetch agents: ChatGPT-User and Perplexity-User act on a live user's
 # request, and both vendors state robots.txt rules may not apply to them. Listing
 # them here is harmless, but blocking them via robots.txt is not guaranteed to work.
+#
+# NOTE on Bing: Bingbot feeds Bing, Microsoft Copilot and Bing-powered answers elsewhere (ChatGPT
+# search is reported to use Bing-class results; DuckDuckGo and Yahoo are reported to as well). Blocking
+# Bingbot removes you from all of them. Also verify the site in Bing Webmaster Tools and enable IndexNow.
 
-# --- Search-index agents: ALLOW so the brand can be cited (respect robots.txt) ---
+# --- Search-index and user-fetch agents: ALLOW public pages so the brand can be cited ---
 User-agent: OAI-SearchBot
-Allow: /
-
-User-agent: Claude-SearchBot
-Allow: /
-
-User-agent: PerplexityBot
-Allow: /
-
-User-agent: Googlebot
-Allow: /
-
-User-agent: Bingbot
-Allow: /
-
-# --- User-initiated fetch agents (may ignore robots.txt; listed for clarity) ---
 User-agent: ChatGPT-User
-Allow: /
-
+User-agent: Claude-SearchBot
 User-agent: Claude-User
-Allow: /
-
+User-agent: PerplexityBot
 User-agent: Perplexity-User
+User-agent: Googlebot
+User-agent: Bingbot
+Disallow: /admin/
+Disallow: /cart/
+Disallow: /checkout/
+Disallow: /account/
 Allow: /
 
-# --- Training agents: owner's choice (uncomment Disallow to opt out of training).
-# Blocking these does NOT remove you from AI search answers.
-# Google-Extended controls Gemini training and grounding; Google states it does not
-# affect Google Search inclusion or ranking.
+# --- Training agents: owner's choice. To opt out of training, replace the private-path
+# lines below with a single "Disallow: /". Blocking these does NOT remove you from AI search
+# answers. Google-Extended and Applebot-Extended are robots.txt tokens only (never sent as a
+# user agent): Google-Extended controls Gemini training and grounding and, per Google, does
+# not affect Google Search inclusion or ranking.
 User-agent: GPTBot
-# Disallow: /
-Allow: /
-
 User-agent: ClaudeBot
-# Disallow: /
-Allow: /
-
 User-agent: Google-Extended
-# Disallow: /
-Allow: /
-
+User-agent: Applebot-Extended
 User-agent: CCBot
-# Disallow: /
+Disallow: /admin/
+Disallow: /cart/
+Disallow: /checkout/
+Disallow: /account/
 Allow: /
 
-# Other bulk/training scrapers many publishers choose to block (owner's choice, verify names):
-# User-agent: Bytespider
-# Disallow: /
-# User-agent: Amazonbot
-# Disallow: /
-# User-agent: Applebot-Extended
-# Disallow: /
-# User-agent: meta-externalagent
-# Disallow: /
+# --- Other assistants and bulk scrapers: owner's choice (verify names before enabling). ---
+# Left unnamed they fall under "*" below, which allows public pages. To block one, add a group
+# with "Disallow: /" for it:
+#   User-agent: Bytespider
+#   User-agent: Amazonbot
+#   User-agent: meta-externalagent
+#   Disallow: /
+# Applebot (Siri/Spotlight search), meta-externalfetcher, MistralAI-User and DuckAssistBot are
+# user-facing assistants: allow them if you want to be cited there.
 
 # --- Everyone else ---
 User-agent: *
