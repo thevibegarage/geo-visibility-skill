@@ -7,6 +7,12 @@ Usage:
 Checks:
   * robots.txt rules for AI crawlers (search, user-fetch, training groups)
   * WAF/CDN behavior: fetches the homepage with different crawler User-Agents and compares status
+  * Render-by-agent: fetches the homepage and each --paths URL as a browser, a listed crawler and
+    unlisted user-fetch agents, and compares word count, title, H1 and JSON-LD. Many sites serve
+    crawlers different HTML from a default fetch, so a default fetch alone can wrongly report an
+    empty shell (or hide that unlisted agents get one).
+  * Soft 404: nonexistent URLs must return 404/410, not 200 with the homepage
+  * Sitemap lastmod honesty: warns when many entries share one date or are stamped today
   * llms.txt, sitemap(s)
   * Homepage: noindex, canonical, title, meta description, h1 count, JSON-LD types,
     visible text in the raw HTML (proxy for "readable without JavaScript")
@@ -22,27 +28,42 @@ import urllib.robotparser
 from html.parser import HTMLParser
 from urllib.parse import urljoin, urlparse
 
+def _bot_ua(name, version="1.0", url=None):
+    # Realistic string: Mozilla prefix, "compatible;", version and an info URL or contact, like real bots.
+    # Exact strings change; verify against each vendor's current documentation.
+    return f"Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; {name}/{version}; +{url or 'https://example.com/bot'})"
+
+
 AGENTS = {
-    # group: {token used in robots.txt: user-agent string sent for the WAF probe}
+    # group: {token used in robots.txt: user-agent string sent for the probes}
     "search_and_user_fetch": {
-        "OAI-SearchBot": "OAI-SearchBot/1.0",
-        "ChatGPT-User": "Mozilla/5.0 (compatible; ChatGPT-User/1.0)",
-        "Claude-SearchBot": "Claude-SearchBot",
-        "Claude-User": "Claude-User",
-        "PerplexityBot": "PerplexityBot/1.0",
-        "Perplexity-User": "Perplexity-User/1.0",
-        "Googlebot": "Mozilla/5.0 (compatible; Googlebot/2.1)",
-        "Bingbot": "Mozilla/5.0 (compatible; bingbot/2.0)",
+        "OAI-SearchBot": _bot_ua("OAI-SearchBot", url="https://openai.com/searchbot"),
+        "ChatGPT-User": _bot_ua("ChatGPT-User", url="https://openai.com/bot"),
+        "Claude-SearchBot": _bot_ua("Claude-SearchBot", url="Claude-SearchBot@anthropic.com"),
+        "Claude-User": _bot_ua("Claude-User", url="Claude-User@anthropic.com"),
+        "PerplexityBot": _bot_ua("PerplexityBot", url="https://perplexity.ai/perplexitybot"),
+        "Perplexity-User": _bot_ua("Perplexity-User", url="https://perplexity.ai/perplexity-user"),
+        "Googlebot": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+        "Bingbot": "Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)",
     },
     "training": {
-        "GPTBot": "GPTBot/1.0",
-        "ClaudeBot": "ClaudeBot/1.0",
+        "GPTBot": _bot_ua("GPTBot", "1.1", "https://openai.com/gptbot"),
+        "ClaudeBot": _bot_ua("ClaudeBot", url="claudebot@anthropic.com"),
         "Google-Extended": "Google-Extended",
-        "CCBot": "CCBot/2.0",
+        "CCBot": "CCBot/2.0 (https://commoncrawl.org/faq/)",
     },
+}
+# Agent classes for the render-by-agent comparison. A site that detects crawlers by user agent
+# may serve listed crawlers full HTML while an unlisted user-fetch agent gets the SPA shell.
+RENDER_AGENTS = {
+    "browser": None,  # filled below once BROWSER_UA exists
+    "listed crawler (GPTBot)": AGENTS["training"]["GPTBot"],
+    "user-fetch (Claude-User)": AGENTS["search_and_user_fetch"]["Claude-User"],
+    "user-fetch (ChatGPT-User)": AGENTS["search_and_user_fetch"]["ChatGPT-User"],
 }
 BROWSER_UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124 Safari/537.36"
 TIMEOUT = 15
+RENDER_AGENTS["browser"] = BROWSER_UA
 
 
 def fetch(url, ua=BROWSER_UA, max_bytes=2_000_000):
@@ -72,6 +93,8 @@ class PageParser(HTMLParser):
         self._buf = []
         self.text = []
         self.script_count = 0
+        self.h1_text = ""
+        self._in_h1 = False
 
     def handle_starttag(self, tag, attrs):
         a = dict(attrs)
@@ -83,6 +106,7 @@ class PageParser(HTMLParser):
             self.canonical = a.get("href")
         elif tag == "h1":
             self.h1 += 1
+            self._in_h1 = True
         elif tag == "h2":
             self.h2 += 1
         elif tag == "script":
@@ -96,6 +120,8 @@ class PageParser(HTMLParser):
             self._skip += 1
 
     def handle_endtag(self, tag):
+        if tag == "h1":
+            self._in_h1 = False
         if tag == "title":
             self._in_title = False
         elif tag == "script":
@@ -108,6 +134,8 @@ class PageParser(HTMLParser):
             self._skip -= 1
 
     def handle_data(self, data):
+        if self._in_h1 and len(self.h1_text) < 200:
+            self.h1_text += data.strip() + " "
         if self._in_title:
             self.title += data
         elif self._in_jsonld:
@@ -138,6 +166,81 @@ def jsonld_types(blocks):
         except Exception:
             errors += 1
     return sorted(types), errors
+
+
+def profile(url, ua):
+    """Fetch url as ua and summarise what an agent that does not run JavaScript would see."""
+    c, h, body, final = fetch(url, ua=ua)
+    pp = PageParser()
+    try:
+        pp.feed(body)
+    except Exception:
+        pass
+    types, _ = jsonld_types(pp.jsonld)
+    return {"code": c, "words": len(" ".join(pp.text).split()), "title": pp.title.strip(),
+            "h1": pp.h1_text.strip(), "types": types, "canonical": pp.canonical}
+
+
+def render_by_agent(url):
+    """Return (status, detail, fix) comparing browser, listed crawler and unlisted user-fetch agents."""
+    prof = {name: profile(url, ua) for name, ua in RENDER_AGENTS.items()}
+    if any(p["code"] == 0 for p in prof.values()):
+        return "warn", "request error for at least one agent", ""
+    summary = "; ".join(f"{n}: HTTP {p['code']}, {p['words']} words, h1 {'yes' if p['h1'] else 'no'}, schema {','.join(p['types']) or 'none'}"
+                        for n, p in prof.items())
+    full = {n: p for n, p in prof.items() if p["words"] >= 150}
+    shell = {n: p for n, p in prof.items() if p["words"] < 150}
+    if not full:
+        return ("fail", "every agent sees under 150 words (an empty shell for everyone). " + summary,
+                "Server-render or statically render this page. Test: curl -s <url> shows its own H1 and 300+ words.")
+    if not shell:
+        titles = {p["title"] for p in prof.values()}
+        if len(titles) > 1:
+            return "warn", "enough text for all agents but titles differ by agent. " + summary, "Check what each agent is served."
+        return "pass", "all agents see full content. " + summary, ""
+    # mixed: some agents get content, some get a shell
+    shell_user_fetch = [n for n in shell if n.startswith("user-fetch")]
+    if "browser" in shell and not shell_user_fetch:
+        return ("pass", "listed crawlers and user-fetch agents get full content; a default browser fetch gets the "
+                "client-rendered shell (dynamic rendering by user agent). " + summary,
+                "Fine for these agents. Make sure the allowlist covers every current AI search and user-fetch agent, and that Google and Bing see the same content.")
+    return ("fail", "user-agent routing gap: " + ", ".join(shell) + " get a shell while " + ", ".join(full) +
+            " get content. " + summary,
+            "Add the missing agents to the crawler allowlist, or server-render for everyone. Test each agent with curl -A.")
+
+
+def soft_404(base):
+    """A nonexistent URL must return 404/410 to crawlers. Returns [(agent, url, code, words)].
+    Probes as a listed crawler and as a user-fetch agent. A browser 200 is expected for single-page
+    apps and is reported as info only, because what matters for citations is what agents get."""
+    import random
+    import string
+    tag = "".join(random.choices(string.ascii_lowercase, k=10))
+    pth = f"/geo-audit-missing-{tag}"
+    out = []
+    for name, ua in RENDER_AGENTS.items():
+        c, _, body, _ = fetch(base + pth, ua=ua)
+        pp = PageParser()
+        try:
+            pp.feed(body)
+        except Exception:
+            pass
+        out.append((name, base + pth, c, len(" ".join(pp.text).split())))
+    return out
+
+
+def sitemap_lastmod(body):
+    """Warn when many lastmod values are identical or stamped today (a sign they are generated, not real)."""
+    import datetime
+    from collections import Counter
+    vals = re.findall(r"<lastmod>\s*([^<\s]+)\s*</lastmod>", body)
+    if len(vals) < 10:
+        return None
+    days = [v[:10] for v in vals]
+    common, n = Counter(days).most_common(1)[0]
+    today = datetime.date.today().isoformat()
+    n_today = sum(1 for d in days if d == today)
+    return {"total": len(vals), "most_common": common, "most_common_n": n, "today_n": n_today}
 
 
 def check(domain, paths):
@@ -217,6 +320,16 @@ def check(domain, paths):
         if c == 200 and ("<urlset" in body or "<sitemapindex" in body):
             n = len(re.findall(r"<loc>", body))
             add("discovery", f"sitemap {sm}", "pass", f"{n} <loc> entries")
+            lm = sitemap_lastmod(body)
+            if lm is None:
+                add("discovery", "sitemap lastmod honesty", "info", "fewer than 10 lastmod values; not assessed")
+            elif lm["today_n"] / lm["total"] > 0.1 or lm["most_common_n"] / lm["total"] > 0.3:
+                add("discovery", "sitemap lastmod honesty", "warn",
+                    f"{lm['today_n']}/{lm['total']} stamped today; {lm['most_common_n']}/{lm['total']} share {lm['most_common']}. "
+                    "Looks generated or bulk-updated rather than real edit dates.",
+                    "Emit each page's real updated date, or omit lastmod.")
+            else:
+                add("discovery", "sitemap lastmod honesty", "pass", f"{lm['total']} values, no suspicious clustering")
             found_sm = True
             break
     if not found_sm:
@@ -251,19 +364,29 @@ def check(domain, paths):
     add("schema", "Organization schema", "pass" if "Organization" in types or "LocalBusiness" in types else "warn",
         "found" if "Organization" in types or "LocalBusiness" in types else "missing on homepage")
 
-    # --- extra paths: quick content/schema check ---
-    for pth in paths:
+    # --- render by agent: homepage plus each --paths URL ---
+    if not paths:
+        add("render", "render by agent: detail pages", "info",
+            "no --paths given, so only the homepage was compared across agents",
+            "Re-run with --paths /a-product-page /a-blog-post /pricing (3-5 representative detail URLs).")
+    for pth in ["/"] + list(paths):
         u = urljoin(base + "/", pth.lstrip("/"))
-        c, h, body, _ = fetch(u)
-        pp = PageParser()
-        try:
-            pp.feed(body)
-        except Exception:
-            pass
-        w = len(" ".join(pp.text).split())
-        t, _ = jsonld_types(pp.jsonld)
-        add("pages", u, "pass" if c == 200 and w >= 150 else "warn",
-            f"HTTP {c}, {w} words raw HTML, schema: {', '.join(t) or 'none'}")
+        st, detail, fix = render_by_agent(u)
+        add("render", f"render by agent: {pth}", st, detail, fix)
+
+    # --- soft 404 ---
+    for name, u, c, w in soft_404(base):
+        if c in (404, 410):
+            add("indexing", f"soft 404 ({name})", "pass", f"{u} -> HTTP {c}")
+        elif name == "browser":
+            add("indexing", f"soft 404 ({name})", "info",
+                f"{u} -> HTTP {c}. Common for single-page apps; people see the app's own not-found view.")
+        elif c == 200:
+            add("indexing", f"soft 404 ({name})", "fail",
+                f"{u} -> HTTP 200 with {w} words (nonexistent URL served to this agent as a page)",
+                "Return a real 404 (and noindex) to crawlers for unknown URLs. Test with curl -A for each agent class.")
+        else:
+            add("indexing", f"soft 404 ({name})", "warn", f"{u} -> HTTP {c}")
 
     # --- score ---
     weights = {"pass": 1.0, "warn": 0.5, "fail": 0.0}

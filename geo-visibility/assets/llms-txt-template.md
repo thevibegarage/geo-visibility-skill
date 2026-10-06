@@ -32,5 +32,5 @@
 Host at {{SITE_URL}}/llms.txt. Keep under roughly 100 links; list only pages you would want quoted.
 Optionally provide /llms-full.txt with expanded markdown of key pages.
 There is no proven ranking effect; this helps agents and developers find clean content.
-Update when pages or prices change.
+Generate programme/product/price sections from the same source of truth as the site (CMS or database) at build time, with a pointer to the live catalogue as the fallback; do not hand-edit prices or dates. Never print a start date that has passed.
 -->

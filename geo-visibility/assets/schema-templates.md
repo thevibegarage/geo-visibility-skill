@@ -133,3 +133,10 @@ Add `aggregateRating` only if the ratings are real and visible on the page.
 }
 </script>
 ```
+
+
+## Courses, events and dated offers
+- Emit `CourseInstance` (inside `Course.hasCourseInstance`) or `Event` only for dates in the future; omit them once the date has passed.
+- Write dates with the local UTC offset or as a plain date (`2026-10-24` or `2026-10-24T00:00:00+05:30`), not a UTC timestamp that falls on the previous local day.
+- Generate every value from the CMS record shown on the page; never hand-copy.
+- Where tax is charged on top of the price, add `"priceSpecification": { "@type": "PriceSpecification", "price": "{{BASE_PRICE}}", "priceCurrency": "{{CUR}}", "valueAddedTaxIncluded": false }` to the `Offer` and state base + tax = total in visible text.

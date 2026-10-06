@@ -44,12 +44,13 @@ python3 geo-visibility/scripts/check_ai_readiness.py yourdomain.com --paths /pri
 
 ## What has been tested (and what hasn't)
 
-We believe in shipping honest software. Status as of 2026-10-05:
+We believe in shipping honest software. Status as of 2026-10-06:
 
 | Area | Status |
 |---|---|
 | Crawler/user-agent names (OpenAI, Anthropic, Perplexity, Google) | ✅ Verified against official vendor docs, 2026-10-05 |
 | Both scripts: happy path + malformed/empty input + mock-site behavior | ✅ Tested |
+| Per-agent rendering comparison and soft-404 checks in `check_ai_readiness.py` | ✅ Tested on a local mock site that routes by user agent (broken and fixed). ❌ Not yet tested on third-party stacks (WordPress, Next.js, Shopify) |
 | Full audit on a real brand (garagelabstech.com, plausible.io) | ✅ Run end-to-end |
 | Refusal of manipulative tactics (fake reviews, hidden AI-directed text) | ✅ Tested with fresh agents |
 | Head-to-head vs. Claude without the skill | ✅ Run once (see below) |

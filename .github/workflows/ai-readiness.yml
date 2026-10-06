@@ -14,6 +14,9 @@ on:
       domain:
         description: "Domain to check (e.g. example.com)"
         required: false
+      paths:
+        description: "Space-separated detail paths to compare across agents (e.g. /pricing /blog/my-post)"
+        required: false
 
 permissions:
   contents: read
@@ -27,12 +30,16 @@ jobs:
       - name: Run AI readiness check
         env:
           DOMAIN: ${{ inputs.domain || vars.GEO_DOMAIN }}
+          # Optional: 3-5 representative detail pages, so the check can compare what a browser, a
+          # listed crawler and unlisted AI user-fetch agents each receive (set the GEO_PATHS variable).
+          PATHS: ${{ inputs.paths || vars.GEO_PATHS }}
         run: |
           if [ -z "$DOMAIN" ]; then
             echo "::error::Set the GEO_DOMAIN repository variable or pass a domain input."
             exit 1
           fi
-          python3 geo-visibility/scripts/check_ai_readiness.py "$DOMAIN" \
+          # $PATHS is intentionally unquoted so it splits into separate arguments
+          python3 geo-visibility/scripts/check_ai_readiness.py "$DOMAIN" --paths $PATHS \
             --json readiness.json | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Fail the run on readiness failures
