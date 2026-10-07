@@ -46,7 +46,7 @@ On macOS with a python.org Python, a `CERTIFICATE_VERIFY_FAILED` result means Py
 
 ## What has been tested (and what hasn't)
 
-We believe in shipping honest software. Status as of 2026-10-06:
+We believe in shipping honest software. Status as of 2026-10-07:
 
 | Area | Status |
 |---|---|

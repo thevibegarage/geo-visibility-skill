@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.1.2 — unreleased
+## v0.1.2 — 2026-10-07
 
 Review fixes, a real Bing/Copilot playbook, and an automated test suite. Every fix below has a regression test that fails on v0.1.1.
 
@@ -40,7 +40,7 @@ Review fixes, a real Bing/Copilot playbook, and an automated test suite. Every f
 ### Known limits
 - Some Bing/Copilot details are still trade-press only (verification methods, the evergreen Bingbot string, the IndexNow-preference and schema statements) and `Bytespider` has no vendor documentation; see the README table.
 - Evals 6-11 were run once or twice by sub-agents (28 of 34 assertions fully met; see `geo-visibility/evals/results-2026-10-07.md`); evals 1-5 were not re-run, and skill triggering from natural phrasing is untested. The checker has been run on two live sites but not on WordPress, Next.js or Shopify stacks.
-- The `v0.1.0` release asset predates v0.1.1 and v0.1.2: rebuild with `python3 tools/build_skill.py` and publish a new release.
+- v0.1.1 was committed but never published as a GitHub release, so v0.1.2 is the first release since v0.1.0 and replaces its `.skill` asset (built with `python3 tools/build_skill.py`).
 
 ## v0.1.1 — 2026-10-06
 
