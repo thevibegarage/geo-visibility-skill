@@ -116,6 +116,7 @@ class Workflows(unittest.TestCase):
         run = next(s["run"] for s in self.load("ai-readiness.yml")["jobs"]["check"]["steps"] if "run" in s)
         self.assertIn("pipefail", run)
         self.assertIn("--fail-on fail", run)
+        self.assertIn("--issues-only", run)
         self.assertIn("--indexnow-key", run)
 
     def test_tests_workflow_runs_the_suite(self):
@@ -130,7 +131,7 @@ class WorkflowCommandShape(unittest.TestCase):
         script = os.path.join(SKILL, "scripts", "check_ai_readiness.py")
         with tempfile.TemporaryDirectory() as d:
             cmd = (f'set -o pipefail; set -f; PATHS="/pricing"; python3 "{script}" "{base}" --paths $PATHS '
-                   f'--json "{d}/r.json" --fail-on fail | tee "{d}/summary.md" >/dev/null')
+                   f'--json "{d}/r.json" --fail-on fail --issues-only | tee "{d}/summary.md" >/dev/null')
             return subprocess.run(["bash", "-c", cmd], capture_output=True, text=True).returncode
 
     def test_exit_codes_survive_tee(self):

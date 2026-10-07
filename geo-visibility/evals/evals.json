@@ -110,9 +110,9 @@
     {
       "id": 9,
       "prompt": "We show up on Google and Bing, but when Claude uses web search it never cites us. What index does Claude use and what should we check?",
-      "expected_output": "States that Claude's web search is reported to run on Brave Search (hedged as reported, not documented by Anthropic as the only source), suggests checking the brand and money queries on search.brave.com, checks Claude-SearchBot and Claude-User access in robots.txt and WAF, notes that WebSearch in the session is a proxy and not consumer Claude, and avoids guarantees.",
+      "expected_output": "Treats Brave Search as a reported but unconfirmed dependency of Claude's web search (trade coverage and result matching; Anthropic's own pages do not confirm it), suggests testing it by checking the brand and money queries on search.brave.com, checks Claude-SearchBot and Claude-User access in robots.txt and WAF, notes that WebSearch in the session is a proxy and not consumer Claude, and avoids guarantees.",
       "assertions": [
-        "Says Claude's web search is reported to use Brave Search and hedges it as reported",
+        "Presents Brave Search as a reported, unconfirmed dependency (not documented fact) and suggests testing it",
         "Recommends checking indexing on search.brave.com",
         "Checks that Claude-SearchBot and Claude-User are allowed in robots.txt and at the WAF",
         "Calls in-session WebSearch a proxy rather than a direct reading of consumer Claude",
@@ -137,10 +137,10 @@
     {
       "id": 11,
       "prompt": "We sell project-management software in India and Japan. Which assistants and crawlers should we audit, and anything special for the Japanese site?",
-      "expected_output": "Starts from the markets: ChatGPT, Gemini, Copilot, Perplexity and AI Overviews as the baseline plus Meta AI for India, and per-market checks for Japan, with every non-baseline crawler name marked as to be verified in vendor docs. Builds prompts in Hindi/Hinglish and Japanese, notes that word counts for Japanese are approximate in the readiness script, reminds to check hreflang and identical entity facts across languages, and invents no crawler tokens or market-share numbers.",
+      "expected_output": "Starts from the markets: ChatGPT, Gemini, Copilot, Perplexity and AI Overviews as the baseline plus Meta AI for India, and per-market checks for Japan, using only documented crawler tokens or pointing to vendor docs. Builds prompts in Hindi/Hinglish and Japanese, notes that word counts for Japanese are approximate in the readiness script, reminds to check hreflang and identical entity facts across languages, and invents no crawler tokens or market-share numbers.",
       "assertions": [
         "Includes Copilot/Bing alongside ChatGPT, Gemini, Perplexity and AI Overviews",
-        "Mentions Meta AI as relevant in India and marks its crawler names as to verify",
+        "Mentions Meta AI as relevant in India and uses only Meta's documented crawler tokens (meta-webindexer, meta-externalagent, meta-externalfetcher) or tells the user to check Meta's crawler documentation",
         "Proposes prompts in Hindi/Hinglish and Japanese",
         "Notes that readiness-script word counts for Japanese are approximate",
         "Mentions hreflang and consistent entity facts across languages",

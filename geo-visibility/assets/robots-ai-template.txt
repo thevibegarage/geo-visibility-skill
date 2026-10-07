@@ -59,8 +59,10 @@ Allow: /
 #   User-agent: Amazonbot
 #   User-agent: meta-externalagent
 #   Disallow: /
-# Applebot (Siri/Spotlight search), meta-externalfetcher, MistralAI-User and DuckAssistBot are
-# user-facing assistants: allow them if you want to be cited there.
+# Applebot (Siri/Spotlight search), Amzn-SearchBot (Alexa search, not used for training),
+# meta-webindexer (Meta AI search), meta-externalfetcher and Amzn-User (user-triggered fetches; their
+# vendors say robots.txt may not apply), MistralAI-User and DuckAssistBot are user-facing assistants:
+# allow them if you want to be cited there. Amazonbot may be used to train Amazon AI models.
 
 # --- Everyone else ---
 User-agent: *

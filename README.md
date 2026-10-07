@@ -23,7 +23,7 @@ The skill works on one idea: **AI engines recommend what they can retrieve, unde
 
 It also includes two standard-library Python scripts:
 
-- `scripts/check_ai_readiness.py <domain>` — checks robots.txt rules (wildcards, longest-match, group semantics) for AI and search agents, WAF behavior, llms.txt, sitemaps (indexes, gzip), JSON-LD, snippet/archive controls, Bing/Google verification hints, IndexNow, and whether key text survives without JavaScript for a browser, listed crawlers, user-fetch agents, Googlebot and Bingbot.
+- `scripts/check_ai_readiness.py <domain>` — opens with a **Must fix** table (failures first, then warnings, each with a concrete fix) and a **Worth checking** list of unscored open points, then every check; `--issues-only` hides the routine passes. It checks robots.txt rules (wildcards, longest-match, group semantics) for AI and search agents, WAF behavior, llms.txt, sitemaps (indexes, gzip), JSON-LD, snippet/archive controls, Bing/Google verification hints, IndexNow, and whether key text survives without JavaScript for a browser, listed crawlers, user-fetch agents, Googlebot and Bingbot.
 - `scripts/score_tracker.py tracker.csv` — rolls your prompt-run CSV into mention rate, citation rate, share of voice, sentiment mix and a cited-domain list, per engine and mode (search vs no-search), with `--by-stage`, `--domain` and month-over-month deltas via `--compare`. Accepts 1/0 or TRUE/FALSE from spreadsheets.
 
 ## Install
@@ -51,16 +51,16 @@ We believe in shipping honest software. Status as of 2026-10-06:
 | Area | Status |
 |---|---|
 | Crawler/user-agent names (OpenAI, Anthropic, Perplexity, Google) | ✅ Verified against official vendor docs, 2026-10-05 |
-| Crawler names and user-agent strings for Bing, Apple, Meta, Amazon, Mistral, DuckDuckGo, ByteDance | ⚠️ Added in v0.1.2 from memory of vendor docs; not verified against them. The script reports these rules as `info`, not failures |
-| Bing/Copilot guidance (`bing-copilot.md`): AI Performance report, `nocache`/`noarchive`, IndexNow | ⚠️ Compiled from trade coverage on 2026-10-06; not re-verified against Microsoft's documentation |
-| "Claude web search runs on Brave" | ⚠️ Reported (Anthropic subprocessor list; observed results match Brave's); not stated by Anthropic as the only source |
-| Automated test suite (`python3 -m unittest discover -s tests`, stdlib only, about 2 seconds) | ✅ 131 tests: both scripts, the robots matcher, the shipped robots template, the workflow's exit-code pipeline, the skill build. Every v0.1.2 fix has a regression test, and those tests fail against v0.1.1 |
+| Crawler tokens and user-agent formats for Googlebot, Bingbot (evergreen form), Applebot/Applebot-Extended, Meta (`meta-webindexer`, `meta-externalagent`, `meta-externalfetcher`), Amazon (`Amazonbot`, `Amzn-SearchBot`, `Amzn-User`), MistralAI-User, DuckAssistBot, Google-Extended | ✅ Checked against the vendors' own pages on 2026-10-07; the script reports the non-search ones as `info`. ⚠️ `Bytespider` (ByteDance): no vendor documentation found, from memory |
+| Bing/Copilot guidance (`bing-copilot.md`) | ✅ AI Performance report (10 Feb 2026) and its June 2026 additions, and `NOCACHE`/`NOARCHIVE` (22 Sep 2023 post, which says "Bing Chat"), checked against Microsoft's Bing blogs 2026-10-07; IndexNow requirements checked against indexnow.org. ⚠️ Still trade-press only: the four verification methods, the evergreen Bingbot string, "Bing recommends IndexNow over its APIs", "schema helps Microsoft's models" |
+| "Claude web search runs on Brave" | ⚠️ Not confirmed. Trade coverage says Anthropic's subprocessor list names Brave Search; Anthropic's own pages could not be read for confirmation on 2026-10-07, and one report says the list also names TurboPuffer for web search. The skill treats it as a hypothesis to test |
+| Automated test suite (`python3 -m unittest discover -s tests`, stdlib only, about 2 seconds) | ✅ 147 tests: both scripts, the robots matcher, the shipped robots template, the workflow's exit-code pipeline, the skill build. Every v0.1.2 fix has a regression test, and those tests fail against v0.1.1 |
 | Both scripts: happy path + malformed/empty input + mock-site behavior | ✅ Tested |
 | Per-agent rendering comparison and soft-404 checks in `check_ai_readiness.py` | ✅ Tested on a local mock site that routes by user agent (broken and fixed). ✅ Run once against two live sites in v0.1.2 (example.com, garagelabstech.com), which surfaced a false "Organization schema missing" warning for `EducationalOrganization` (fixed). ❌ Not yet tested on third-party stacks (WordPress, Next.js, Shopify) |
 | Full audit on a real brand (garagelabstech.com, plausible.io) | ✅ Run end-to-end |
 | Refusal of manipulative tactics (fake reviews, hidden AI-directed text) | ✅ Tested with fresh agents |
 | Head-to-head vs. Claude without the skill | ✅ Run once (see below) |
-| New evals 6-11 (Bing/Copilot, snippet controls, robots groups, Brave, tracker, India/Japan) | ❌ Written, with checkable assertions, but not yet run against an agent |
+| New evals 6-11 (Bing/Copilot, snippet controls, robots groups, Brave, tracker, India/Japan) | ✅ Run on 2026-10-07 by sub-agents acting as Claude with the skill installed, graded by hand: 28 of 34 assertions fully met in the latest run of each; the misses are secondary points dropped from short quick answers. Details in [`evals/results-2026-10-07.md`](geo-visibility/evals/results-2026-10-07.md). Single runs, so a smoke test, not a benchmark. Evals 1-5 were not re-run |
 | Per-engine behavioral claims (what each engine rewards) | ⚠️ Practitioner reports, hedged in the text — not controlled studies |
 | Trigger reliability from natural phrasing | ❌ Not yet tested |
 | Multi-month outcome data (does following the plan move citations?) | ❌ Not yet — run your own baseline and re-test monthly |
@@ -76,7 +76,7 @@ We believe in shipping honest software. Status as of 2026-10-06:
 | Claude | ✅ plus a Brave index note | ✅ Claude-SearchBot, Claude-User, ClaudeBot | ✅ | — |
 | Gemini / Google AI Overviews | ✅ | ✅ Googlebot, Google-Extended; snippet controls | ✅ | Search Console |
 | Perplexity | ✅ | ✅ PerplexityBot, Perplexity-User | ✅ | — |
-| Meta AI, Apple, Amazon, Mistral, DuckDuckGo | ⚠️ checklist only | ⚠️ robots rows reported as `info` | add by name | — |
+| Meta AI, Apple, Amazon (Alexa), Mistral, DuckDuckGo | ⚠️ checklist only | ✅ documented tokens, reported as `info` (a business choice) | add by name | — |
 | Brave, Grok, DeepSeek, Baidu, Naver, Yandex | ⚠️ pointers only | ❌ | add by name | — |
 
 ## What this skill will not do

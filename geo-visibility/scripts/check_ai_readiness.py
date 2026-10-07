@@ -3,7 +3,7 @@
 
 Usage:
     python check_ai_readiness.py example.com [--paths /pricing /about] [--json out.json]
-                                 [--indexnow-key KEY] [--fail-on {none,fail}]
+                                 [--indexnow-key KEY] [--fail-on {none,fail}] [--issues-only]
 
 Checks:
   * robots.txt rules for AI and search agents (search, user-fetch, training groups), evaluated
@@ -27,6 +27,9 @@ The score weights each check once: per-agent rows (robots, WAF, soft 404) collap
 row in their group, so a wall of trivial passes cannot hide a failure.
 
 Crawler names change. Treat the AGENTS table as a starting point and verify against vendor docs.
+Output: a "Must fix" table first (failures, then warnings, each with a concrete fix; per-agent rows of one kind
+are merged), then unscored open points, then every check. --issues-only hides passing checks and routine "allowed" rows. The JSON output
+carries the same lists as "must_fix" and "worth_checking".
 Exit codes: 0 ok, 1 failures found (with --fail-on fail), 2 unreachable, 3 homepage returned an
 HTTP error (checks stop: there is no content to assess).
 """
@@ -57,17 +60,25 @@ AGENTS = {
         "Claude-User": _bot_ua("Claude-User", url="Claude-User@anthropic.com"),
         "PerplexityBot": _bot_ua("PerplexityBot", url="https://perplexity.ai/perplexitybot"),
         "Perplexity-User": _bot_ua("Perplexity-User", url="https://perplexity.ai/perplexity-user"),
-        "Googlebot": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
-        "Bingbot": "Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)",
+        "Googlebot": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Googlebot/2.1; "
+                     "+http://www.google.com/bot.html) Chrome/124.0.0.0 Safari/537.36",
+        "Bingbot": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; bingbot/2.0; "
+                   "+http://www.bing.com/bingbot.htm) Chrome/124.0.0.0 Safari/537.36",
     },
     # Other assistants and search surfaces. Reported as info: allowing or blocking them is a business choice.
+    # Tokens and user-agent formats checked against each vendor's documentation on 2026-10-07 (Chrome/W.X.Y.Z
+    # placeholders are filled with a sample version). user-fetch agents (meta-externalfetcher, Amzn-User) may
+    # not follow robots.txt, per their vendors.
     "other_ai": {
         "Applebot": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_5) AppleWebKit/605.1.15 (KHTML, like Gecko) "
                     "Version/13.1.1 Safari/605.1.15 (Applebot/0.1; +http://www.apple.com/go/applebot)",
-        "Amazonbot": "Mozilla/5.0 AppleWebKit/600.2.5 (KHTML, like Gecko) Version/8.0.2 Safari/600.2.5 "
-                     "(Amazonbot/0.1; +https://developer.amazon.com/support/amazonbot)",
-        "meta-externalagent": "meta-externalagent/1.1 (+https://developers.facebook.com/docs/sharing/webmasters/crawler)",
-        "meta-externalfetcher": "meta-externalfetcher/1.1 (+https://developers.facebook.com/docs/sharing/webmasters/crawler)",
+        "Amzn-SearchBot": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Amzn-SearchBot/0.1) "
+                          "Chrome/124.0.0.0 Safari/537.36",
+        "Amzn-User": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Amzn-User/0.1) "
+                     "Chrome/124.0.0.0 Safari/537.36",
+        "meta-webindexer": "meta-webindexer/1.1 (+https://developers.facebook.com/docs/sharing/webmasters/web-crawlers)",
+        "meta-externalagent": "meta-externalagent/1.1 (+https://developers.facebook.com/docs/sharing/webmasters/web-crawlers)",
+        "meta-externalfetcher": "meta-externalfetcher/1.1 (+https://developers.facebook.com/docs/sharing/webmasters/web-crawlers)",
         "MistralAI-User": _bot_ua("MistralAI-User", url="https://docs.mistral.ai/robots"),
         "DuckAssistBot": _bot_ua("DuckAssistBot", "1.2", "http://duckduckgo.com/duckassistbot.html"),
     },
@@ -75,8 +86,11 @@ AGENTS = {
         "GPTBot": _bot_ua("GPTBot", "1.1", "https://openai.com/gptbot"),
         "ClaudeBot": _bot_ua("ClaudeBot", url="claudebot@anthropic.com"),
         "Google-Extended": "Google-Extended",  # robots.txt token only; never sent as a user agent
-        "Applebot-Extended": "Applebot-Extended",  # robots.txt token only
+        "Applebot-Extended": "Applebot-Extended",  # robots.txt token only (Apple: it does not crawl)
+        "Amazonbot": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Amazonbot/0.1) "
+                     "Chrome/124.0.0.0 Safari/537.36",  # Amazon: may be used to train Amazon AI models
         "CCBot": "CCBot/2.0 (https://commoncrawl.org/faq/)",
+        # Bytespider: no vendor documentation found on 2026-10-07; string and token are from memory
         "Bytespider": "Mozilla/5.0 (Linux; Android 5.0) AppleWebKit/537.36 (KHTML, like Gecko) "
                       "Mobile Safari/537.36 (compatible; Bytespider; spider-feedback@bytedance.com)",
     },
@@ -361,7 +375,7 @@ def render_by_agent(url):
     """Return (status, detail, fix) comparing browser, listed crawler, unlisted user-fetch agents, Googlebot, Bingbot."""
     prof = {name: profile(url, ua) for name, ua in RENDER_AGENTS.items()}
     if any(p["code"] == 0 for p in prof.values()):
-        return "warn", "request error for at least one agent", ""
+        return "warn", "request error for at least one agent", "Re-run the check; if it persists, look for TLS, DNS or rate-limit problems."
     summary = "; ".join(f"{n}: HTTP {p['code']}, {p['words']} words, h1 {'yes' if p['h1'] else 'no'}, schema {','.join(p['types']) or 'none'}"
                         for n, p in prof.items())
     if not 200 <= prof["browser"]["code"] < 300:
@@ -522,6 +536,57 @@ def check_sitemaps(base, from_robots, paths, add):
 # Main check
 # ---------------------------------------------------------------------------------------------
 
+AREA_ORDER = {"access": 0, "render": 1, "indexing": 2, "discovery": 3, "schema": 4, "onpage": 5}
+# Per-agent rows that share a group are listed once: (label, how to pull the agent name out of the check name)
+GROUP_LABELS = {
+    "robots-agents": ("robots.txt blocks AI or search agents", lambda c: c.split(": ", 1)[1].split(" (")[0]),
+    "waf-agents": ("WAF refuses crawler user agents", lambda c: c.split(": ", 1)[1]),
+    "soft404": ("Unknown URLs return a page to crawlers (soft 404)", lambda c: c[len("soft 404 ("):-1]),
+}
+NO_FIX = "No automatic fix is suggested: read the detail and decide."
+
+
+def _short(detail, limit=220):
+    """The headline of a finding: render rows end with a long per-agent summary that the full table keeps."""
+    detail = detail.split(". browser:")[0]
+    return detail if len(detail) <= limit else detail[: limit - 3].rstrip() + "..."
+
+
+def must_fix(findings):
+    """Failures first, then warnings; within each, by area (access, render, indexing, ...). Info and pass rows are excluded.
+
+    Per-agent rows of one group (robots, WAF, soft 404) with the same status become a single entry that names the agents.
+    """
+    out, merged = [], {}
+    for f in findings:
+        if f["status"] not in ("fail", "warn"):
+            continue
+        key = (f["group"], f["status"])
+        if f["group"] in GROUP_LABELS:
+            label, who = GROUP_LABELS[f["group"]]
+            if key in merged:
+                merged[key]["agents"].append(who(f["check"]))
+                continue
+            entry = {"status": f["status"], "area": f["area"], "check": label, "agents": [who(f["check"])],
+                     "detail": _short(f["detail"]), "fix": f["fix"] or NO_FIX}
+            merged[key] = entry
+        else:
+            entry = {"status": f["status"], "area": f["area"], "check": f["check"], "agents": [],
+                     "detail": _short(f["detail"]), "fix": f["fix"] or NO_FIX}
+        out.append(entry)
+    for e in out:
+        if e["agents"]:
+            e["detail"] = ", ".join(e["agents"]) + f" ({e['detail']})"
+    out.sort(key=lambda e: (0 if e["status"] == "fail" else 1, AREA_ORDER.get(e["area"], 9)))  # stable: keeps check order
+    return out
+
+
+def worth_checking(findings):
+    """Unscored (info) rows that carry a suggested action: not defects, but open points."""
+    return [{"check": f["check"], "detail": _short(f["detail"]), "fix": f["fix"]}
+            for f in findings if f["status"] == "info" and f["fix"]]
+
+
 def _tokens(value):
     return [t for t in re.split(r"[,\s]+", value.lower()) if t]
 
@@ -607,7 +672,8 @@ def check(domain, paths, indexnow_key=None):
                     f"HTTP {c} vs {code0} for browser UA (UA-string probe only; real bots also use IP ranges)",
                     "Check CDN/WAF bot rules and allowlist verified AI agents.", group="waf-agents")
         elif c == 0:
-            add("access", f"WAF probe: {token}", "warn", "request error", group="waf-agents")
+            add("access", f"WAF probe: {token}", "warn", "request error",
+                "Re-run the check; if it persists, look for TLS, DNS or rate-limit problems.", group="waf-agents")
         else:
             add("access", f"WAF probe: {token}", "pass", f"HTTP {c}", group="waf-agents")
 
@@ -642,27 +708,32 @@ def check(domain, paths, indexnow_key=None):
     for k, v in directives.items():
         toks = set(_tokens(v))
         if "nosnippet" in toks or "max-snippet:0" in toks:
-            limits.append(f"{k}: nosnippet/max-snippet:0 (blocks quoting in Google AI Overviews and Bing/Copilot answers)")
+            limits.append(f"{k}: nosnippet/max-snippet:0 (Google: also excluded from AI Overviews and AI Mode as direct input; Bing: respected for generative captions)")
         if "noarchive" in toks:
-            limits.append(f"{k}: noarchive (Bing: page is not linked in Copilot answers, per Bing docs)")
+            limits.append(f"{k}: noarchive (Bing: not included in or linked from Bing Chat/Copilot answers, and not used for training)")
         if "nocache" in toks:
-            limits.append(f"{k}: nocache (Bing: only URL, title and snippet may be used)")
+            limits.append(f"{k}: nocache (Bing: answers show only URL, title and snippet; training use limited to the same)")
     add("indexing", "snippet and archive controls", "warn" if limits else "pass",
         "; ".join(limits) if limits else "no nosnippet, max-snippet:0, noarchive or nocache on the homepage",
         "If this is not a deliberate opt-out, remove it: these directives limit how AI answers can quote or link the page."
         if limits else "")
     add("indexing", "canonical", "pass" if p.canonical else "warn", p.canonical or "missing", "Add a canonical tag." if not p.canonical else "")
-    add("onpage", "title", "pass" if 10 <= len(p.title.strip()) <= 70 else "warn", p.title.strip()[:90] or "missing")
+    title_ok = 10 <= len(p.title.strip()) <= 70
+    add("onpage", "title", "pass" if title_ok else "warn", p.title.strip()[:90] or "missing",
+        "" if title_ok else "Use a title of 10-70 characters that says what the page is and who it is for.")
     desc = p.meta.get("description", "")
-    add("onpage", "meta description", "pass" if desc else "warn", desc[:120] or "missing")
-    add("onpage", "single h1", "pass" if p.h1 == 1 else "warn", f"{p.h1} h1, {p.h2} h2")
+    add("onpage", "meta description", "pass" if desc else "warn", desc[:120] or "missing",
+        "" if desc else "Add a meta description: one or two sentences that state the offer.")
+    add("onpage", "single h1", "pass" if p.h1 == 1 else "warn", f"{p.h1} h1, {p.h2} h2",
+        "" if p.h1 == 1 else "Use exactly one H1 that matches the page topic.")
     types, errs = jsonld_types(p.jsonld)
     add("schema", "JSON-LD present", "pass" if types else "fail", ", ".join(types) or "none",
         "Add Organization/WebSite JSON-LD (assets/schema-templates.md)." if not types else "")
     if errs:
         add("schema", "JSON-LD parse errors", "fail", f"{errs} block(s) invalid JSON", "Fix JSON syntax.")
     org = [t for t in types if is_organization_type(t)]
-    add("schema", "Organization schema", "pass" if org else "warn", ", ".join(org) if org else "missing on homepage")
+    add("schema", "Organization schema", "pass" if org else "warn", ", ".join(org) if org else "missing on homepage",
+        "" if org else "Add Organization JSON-LD with name, url, logo and sameAs (assets/schema-templates.md).")
 
     # --- search-engine webmaster hints (Bing feeds Copilot and, reportedly, ChatGPT search and DuckDuckGo) ---
     c, _, bx, _ = fetch(base + "/BingSiteAuth.xml")
@@ -676,8 +747,12 @@ def check(domain, paths, indexnow_key=None):
             "Verify the site in Bing Webmaster Tools, submit the sitemap, enable IndexNow, and read the AI Performance report.")
     add("indexing", "Google Search Console verification", "pass" if p.meta.get("google-site-verification") else "info",
         "google-site-verification meta tag found" if p.meta.get("google-site-verification")
-        else "no google-site-verification meta tag found (a DNS record or file also verifies a site)")
-    if indexnow_key:
+        else "no google-site-verification meta tag found (a DNS record or file also verifies a site)",
+        "" if p.meta.get("google-site-verification") else "Verify the site in Google Search Console and submit the sitemap.")
+    if indexnow_key and not re.fullmatch(r"[A-Za-z0-9-]{8,128}", indexnow_key):
+        add("discovery", "IndexNow key file", "warn", "the key is not a valid IndexNow key (8-128 letters, digits and dashes)",
+            "Generate a key at indexnow.org (or in Bing Webmaster Tools) and host it as <key>.txt at the site root.")
+    elif indexnow_key:
         c, _, kb, _ = fetch(f"{base}/{indexnow_key}.txt")
         if c == 200 and kb.strip() == indexnow_key:
             add("discovery", "IndexNow key file", "pass", f"/{indexnow_key}.txt matches the key")
@@ -685,7 +760,8 @@ def check(domain, paths, indexnow_key=None):
             add("discovery", "IndexNow key file", "warn", f"/{indexnow_key}.txt returned HTTP {c} or a different value",
                 "Host the key file at the site root (or the keyLocation you submit with) so Bing and other IndexNow engines accept submissions.")
     else:
-        add("discovery", "IndexNow key file", "info", "not checked (pass --indexnow-key KEY to verify /KEY.txt)")
+        add("discovery", "IndexNow key file", "info", "not checked (pass --indexnow-key KEY to verify /KEY.txt)",
+            "Enable IndexNow (Bing and other engines) and re-run with --indexnow-key to verify the key file.")
 
     # --- render by agent: homepage plus each --paths URL ---
     if not paths:
@@ -710,7 +786,8 @@ def check(domain, paths, indexnow_key=None):
                 "Return a real 404 (and noindex) to crawlers for unknown URLs. Test with curl -A for each agent class.",
                 group="soft404")
         else:
-            add("indexing", f"soft 404 ({name})", "warn", f"{u} -> HTTP {c}", group="soft404")
+            add("indexing", f"soft 404 ({name})", "warn", f"{u} -> HTTP {c}",
+                "Return 404 or 410 for unknown URLs; check why this agent got an unexpected status.", group="soft404")
 
     # --- score: every check counts once; grouped rows collapse to the worst row in the group ---
     weights = {"pass": 1.0, "warn": 0.5, "fail": 0.0}
@@ -721,6 +798,9 @@ def check(domain, paths, indexnow_key=None):
             units[key] = min(units.get(key, 1.0), weights[f["status"]])
     res["scores"]["technical_readiness_pct"] = round(100 * sum(units.values()) / max(1, len(units)))
     res["scores"]["fail_count"] = sum(1 for f in res["findings"] if f["status"] == "fail")
+    res["scores"]["warn_count"] = sum(1 for f in res["findings"] if f["status"] == "warn")
+    res["must_fix"] = must_fix(res["findings"])
+    res["worth_checking"] = worth_checking(res["findings"])
     return res
 
 
@@ -728,7 +808,7 @@ def _cell(s):
     return str(s).replace("|", "\\|").replace("\n", " ")
 
 
-def to_markdown(res):
+def to_markdown(res, issues_only=False):
     if res.get("unreachable"):
         hint = ""
         if "CERTIFICATE_VERIFY_FAILED" in (res.get("error") or ""):
@@ -745,10 +825,28 @@ def to_markdown(res):
         return (f"# AI readiness: {res['domain']}\n\n**HOMEPAGE RETURNED HTTP {res['homepage_error']}**: page-level checks were skipped "
                 "and no score was computed, because there is no page content to assess.\n\n"
                 f"{f['fix']}")
+    scores = res["scores"]
     out = [f"# AI readiness: {res['domain']}", "",
-           f"Technical readiness: **{res['scores']['technical_readiness_pct']}%** ({res['scores']['fail_count']} failures)", "",
-           "| Area | Check | Status | Detail | Fix |", "|---|---|---|---|---|"]
-    for f in res["findings"]:
+           f"Technical readiness: **{scores['technical_readiness_pct']}%** "
+           f"({scores['fail_count']} failures, {scores.get('warn_count', 0)} warnings)", ""]
+    fixes = res.get("must_fix", [])
+    out += [f"## Must fix ({len(fixes)})", ""]
+    if fixes:
+        out += ["| # | Severity | Area | Issue | Detail | Fix |", "|---|---|---|---|---|---|"]
+        for n, e in enumerate(fixes, 1):
+            out.append(f"| {n} | {e['status']} | {_cell(e['area'])} | {_cell(e['check'])} | {_cell(e['detail'])} | {_cell(e['fix'])} |")
+    else:
+        out.append("Nothing failed or warned.")
+    extra = res.get("worth_checking", [])
+    if extra:
+        out += ["", "## Worth checking (not scored)", ""]
+        out += [f"- **{_cell(e['check'])}**: {_cell(e['detail'])} \u2014 {_cell(e['fix'])}" for e in extra]
+    routine = lambda f: f["status"] == "pass" or (f["status"] == "info" and f["detail"] == "allowed")
+    rows = [f for f in res["findings"] if not (issues_only and routine(f))]
+    hidden = len(res["findings"]) - len(rows)
+    out += ["", f"## All checks{f' ({hidden} routine checks hidden)' if hidden else ''}", "",
+            "| Area | Check | Status | Detail | Fix |", "|---|---|---|---|---|"]
+    for f in rows:
         out.append(f"| {_cell(f['area'])} | {_cell(f['check'])} | {f['status']} | {_cell(f['detail'])} | {_cell(f['fix'])} |")
     return "\n".join(out)
 
@@ -761,9 +859,11 @@ def main(argv=None):
     ap.add_argument("--indexnow-key", help="verify the IndexNow key file at /KEY.txt")
     ap.add_argument("--fail-on", choices=("none", "fail"), default="none",
                     help="exit 1 when any check fails (for CI)")
+    ap.add_argument("--issues-only", action="store_true",
+                    help="hide passing checks and routine 'allowed' rows from the All checks table (the JSON output keeps every check)")
     a = ap.parse_args(argv)
     res = check(a.domain, a.paths, a.indexnow_key)
-    print(to_markdown(res))
+    print(to_markdown(res, a.issues_only))
     if a.json:
         with open(a.json, "w") as fh:
             json.dump(res, fh, indent=2)

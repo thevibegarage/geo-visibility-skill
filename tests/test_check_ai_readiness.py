@@ -96,6 +96,32 @@ class ParserRobustness(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------------------------
+class UserAgentStrings(unittest.TestCase):
+    """Strings follow the vendors' documented formats (checked 2026-10-07)."""
+
+    def test_search_crawlers_use_the_evergreen_chrome_form(self):
+        for token in ("Googlebot", "Bingbot"):
+            ua = ck.AGENTS["search_and_user_fetch"][token]
+            self.assertTrue(ua.startswith("Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; "), token)
+            self.assertRegex(ua, r"Chrome/\d+\.\d+\.\d+\.\d+ Safari/537\.36$")
+        self.assertIn("bingbot/2.0; +http://www.bing.com/bingbot.htm", ck.AGENTS["search_and_user_fetch"]["Bingbot"])
+        self.assertIn("Googlebot/2.1; +http://www.google.com/bot.html", ck.AGENTS["search_and_user_fetch"]["Googlebot"])
+
+    def test_every_probe_string_names_its_own_token(self):
+        for group, agents in ck.AGENTS.items():
+            for token, ua in agents.items():
+                if token in ("Google-Extended", "Applebot-Extended"):  # robots.txt tokens, never sent as user agents
+                    self.assertEqual(ua, token)
+                else:
+                    self.assertIn(token.lower().replace("-", ""), ua.lower().replace("-", ""), token)
+
+    def test_amazon_agents_and_meta_indexer_are_present(self):
+        other = ck.AGENTS["other_ai"]
+        for token in ("Amzn-SearchBot", "Amzn-User", "meta-webindexer", "meta-externalfetcher"):
+            self.assertIn(token, other)
+        self.assertIn("Amazonbot", ck.AGENTS["training"])  # Amazon: may be used to train Amazon AI models
+
+
 class OrganizationSchema(unittest.TestCase):
     """Regression (found on a live site): EducationalOrganization on the homepage was reported as 'Organization missing'."""
 
@@ -247,8 +273,9 @@ class RobotsRows(unittest.TestCase):
         self.assertIn("1/2", row["detail"])
 
     def test_training_and_other_ai_blocks_are_info_not_failures(self):
-        res = self.check("User-agent: GPTBot\nUser-agent: Bytespider\nUser-agent: Amazonbot\nDisallow: /\n")
-        for name in ("robots: GPTBot (training)", "robots: Bytespider (training)", "robots: Amazonbot (other_ai)"):
+        res = self.check("User-agent: GPTBot\nUser-agent: Bytespider\nUser-agent: Amazonbot\nUser-agent: Amzn-SearchBot\nDisallow: /\n")
+        for name in ("robots: GPTBot (training)", "robots: Bytespider (training)", "robots: Amazonbot (training)",
+                     "robots: Amzn-SearchBot (other_ai)"):
             row = one(res, name)
             self.assertEqual(row["status"], "info", name)
             self.assertIn("blocked", row["detail"])
@@ -257,8 +284,8 @@ class RobotsRows(unittest.TestCase):
     def test_other_assistants_are_covered(self):
         with good_site() as s:
             res = ck.check(s.base, [])
-        for token in ("Applebot", "Amazonbot", "meta-externalagent", "meta-externalfetcher", "MistralAI-User",
-                      "DuckAssistBot", "Applebot-Extended", "Bytespider", "Bingbot"):
+        for token in ("Applebot", "Amazonbot", "Amzn-SearchBot", "Amzn-User", "meta-webindexer", "meta-externalagent",
+                      "meta-externalfetcher", "MistralAI-User", "DuckAssistBot", "Applebot-Extended", "Bytespider", "Bingbot"):
             self.assertTrue(by_check(res, f"robots: {token} "), token)
 
     def test_robots_5xx_is_a_failure_and_per_agent_rules_are_not_assessed(self):
@@ -477,6 +504,14 @@ class BingAndIndexNow(unittest.TestCase):
             self.assertEqual(status_of(ck.check(s.base, [], indexnow_key="otherkey"), "IndexNow key file"), "warn")
             self.assertEqual(status_of(ck.check(s.base, []), "IndexNow key file"), "info")
 
+    def test_malformed_indexnow_key_is_flagged_without_a_request(self):
+        for bad in ("short", "has spaces in it", "x" * 129, "bad/slash/key1"):
+            with self.subTest(key=bad):
+                with good_site() as s:
+                    row = one(ck.check(s.base, [], indexnow_key=bad), "IndexNow key file")
+                self.assertEqual(row["status"], "warn")
+                self.assertIn("not a valid IndexNow key", row["detail"])
+
     def test_indexnow_key_flag_on_the_cli(self):
         key = "k" * 16
         with good_site(extra={f"/{key}.txt": (200, {"Content-Type": "text/plain"}, key)}) as s:
@@ -500,6 +535,144 @@ class SoftFourOhFour(unittest.TestCase):
         with good_site() as s:
             res = ck.check(s.base, [])
         self.assertTrue(all(f["status"] == "pass" for f in res["findings"] if f["check"].startswith("soft 404")))
+
+
+# ---------------------------------------------------------------------------------------------
+BARE = f"<!doctype html><html><head><title>A decent page title here</title></head><body><h1>Hi</h1><p>{lorem(300)}</p></body></html>"
+BOT_BLOCKED = lambda p, ua: (403, {}, "no") if ua != ck.BROWSER_UA and p != "/robots.txt" else None
+
+
+class MustFix(unittest.TestCase):
+    """The checker has to say what to fix, not just print 50 rows: failures first, each with a concrete fix."""
+
+    def broken(self):
+        robots = (200, {"Content-Type": "text/plain"}, "User-agent: OAI-SearchBot\nDisallow: /\n")
+        return good_site(extra={"/robots.txt": robots, "/": BARE})
+
+    def test_failures_come_before_warnings_and_every_entry_has_a_fix(self):
+        with self.broken() as s:
+            res = ck.check(s.base, [])
+        entries = res["must_fix"]
+        statuses = [e["status"] for e in entries]
+        self.assertEqual(statuses, sorted(statuses, key=lambda x: 0 if x == "fail" else 1))
+        self.assertIn("fail", statuses)
+        self.assertIn("warn", statuses)
+        self.assertTrue(all(e["fix"].strip() and e["fix"] != ck.NO_FIX for e in entries), entries)
+        self.assertTrue(all(e["status"] in ("fail", "warn") for e in entries))
+        self.assertEqual(entries[0]["area"], "access")  # retrieval blockers first
+
+    def test_scores_include_a_warning_count(self):
+        with self.broken() as s:
+            res = ck.check(s.base, [])
+        self.assertEqual(res["scores"]["warn_count"], sum(1 for f in res["findings"] if f["status"] == "warn"))
+
+    def test_per_agent_robots_rows_are_merged_into_one_entry(self):
+        robots = (200, {"Content-Type": "text/plain"}, "User-agent: *\nDisallow: /\n")
+        with good_site(extra={"/robots.txt": robots}) as s:
+            res = ck.check(s.base, [])
+        rows = [e for e in res["must_fix"] if e["check"].startswith("robots.txt blocks")]
+        self.assertEqual(len(rows), 1)
+        for token in ck.AGENTS["search_and_user_fetch"]:
+            self.assertIn(token, rows[0]["detail"])
+        self.assertEqual(res["scores"]["fail_count"], 8)  # the raw count is unchanged
+
+    def test_soft_404_rows_are_merged_and_waf_failures_and_warnings_stay_separate(self):
+        h = lambda p, ua: (200, {}, html_page()) if p.startswith("/geo-audit-missing") else None
+        with good_site(handler=h) as s:
+            res = ck.check(s.base, [])
+        soft = [e for e in res["must_fix"] if "soft 404" in e["check"]]
+        self.assertEqual(len(soft), 1)
+        self.assertIn("Bingbot", soft[0]["detail"])
+        h = lambda p, ua: (403, {}, "no") if p == "/" and ("Googlebot" in ua or "OAI-SearchBot" in ua) else None
+        with good_site(handler=h) as s:
+            res = ck.check(s.base, [])
+        waf = [(e["status"], e["detail"].split(" (")[0]) for e in res["must_fix"] if e["check"].startswith("WAF refuses")]
+        self.assertEqual(sorted(waf), [("fail", "OAI-SearchBot"), ("warn", "Googlebot")])
+
+    def test_markdown_leads_with_the_must_fix_table(self):
+        with self.broken() as s:
+            md = ck.to_markdown(ck.check(s.base, []))
+        self.assertLess(md.index("## Must fix"), md.index("## All checks"))
+        self.assertRegex(md, r"\(\d+ failures, \d+ warnings\)")
+        first_row = next(line for line in md.splitlines() if line.startswith("| 1 |"))
+        self.assertIn("| fail |", first_row)
+
+    def test_healthy_site_has_nothing_to_fix(self):
+        with good_site(extra={"/indexnow-key-1234.txt": "indexnow-key-1234"}) as s:
+            md = ck.to_markdown(ck.check(s.base, [], indexnow_key="indexnow-key-1234"))
+        self.assertIn("## Must fix (0)", md)
+        self.assertIn("Nothing failed or warned.", md)
+
+    def test_issues_only_hides_passing_rows_but_json_keeps_everything(self):
+        with self.broken() as s, tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "r.json")
+            code, full = run_main(ck, [s.base])
+            code, short = run_main(ck, [s.base, "--issues-only", "--json", path])
+            with open(path) as fh:
+                data = json.load(fh)
+        tail = short.split("## All checks")[1]
+        self.assertNotIn("| pass |", tail)
+        self.assertRegex(tail.splitlines()[0], r"\(\d+ routine checks hidden\)")
+        self.assertNotIn("| info | allowed |", tail)
+        self.assertIn("| pass |", full.split("## All checks")[1])
+        self.assertIn("## Must fix", short)
+        self.assertGreater(sum(1 for f in data["findings"] if f["status"] == "pass"), 0)
+        self.assertTrue(data["must_fix"])
+        self.assertIn("worth_checking", data)
+
+    def test_issues_only_still_shows_a_blocked_training_agent(self):
+        robots = (200, {"Content-Type": "text/plain"}, "User-agent: GPTBot\nDisallow: /\n")
+        with good_site(extra={"/robots.txt": robots}) as s:
+            _, out = run_main(ck, [s.base, "--issues-only"])
+        self.assertRegex(out, r"robots: GPTBot \(training\) \| info \| blocked")
+
+    def test_worth_checking_lists_unscored_open_points(self):
+        with good_site(extra={"/": html_page()}) as s:  # no Bing or Google verification tag
+            res = ck.check(s.base, [])
+        names = [e["check"] for e in res["worth_checking"]]
+        self.assertIn("Bing Webmaster Tools verification", names)
+        self.assertIn("IndexNow key file", names)
+        self.assertIn("Google Search Console verification", names)
+        self.assertEqual(res["must_fix"], [])  # info rows are not defects
+        with good_site() as s:  # has the msvalidate tag
+            names = [e["check"] for e in ck.check(s.base, [])["worth_checking"]]
+        self.assertNotIn("Bing Webmaster Tools verification", names)
+
+    def test_no_failing_or_warning_row_ever_has_an_empty_fix(self):
+        """Regression: title, meta description, H1 and a few other warnings used to print an empty Fix cell."""
+        fixtures = {
+            "bare page": dict(extra={"/": BARE}),
+            "no meta/h1/title": dict(extra={"/": "<html><body><p>" + lorem(300) + "</p></body></html>"}),
+            "robots 5xx": dict(extra={"/robots.txt": (503, {}, "x")}),
+            "robots 404": dict(extra={"/robots.txt": (404, {}, "x")}),
+            "robots html": dict(extra={"/robots.txt": html_page()}),
+            "bots refused": dict(handler=BOT_BLOCKED),
+            "catch-all 200": dict(handler=lambda p, ua: (200, {}, html_page()) if p.startswith("/geo-audit-missing") else None),
+            "noindex+nosnippet": dict(extra={"/": html_page(head="<meta name='robots' content='noindex, nosnippet'>")}),
+            "shell": dict(extra={"/": SHELL}),
+            "short page": dict(extra={"/": html_page(words=80)}),
+            "no sitemap": dict(extra={"/sitemap.xml": (404, {}, "nf")}),
+            "title mismatch": dict(handler=lambda p, ua: html_page(title="Different title for the bot", words=400) if p == "/" and "GPTBot" in ua else None),
+        }
+        for name, kw in fixtures.items():
+            with self.subTest(fixture=name):
+                with good_site(**kw) as s:
+                    res = ck.check(s.base, ["/pricing"])
+                for f in res["findings"]:
+                    if f["status"] in ("fail", "warn"):
+                        self.assertTrue(f["fix"].strip(), f"{name}: {f['check']} has no fix")
+                self.assertTrue(all(e["fix"] != ck.NO_FIX for e in res["must_fix"]), name)
+
+    def test_short_keeps_headlines_and_truncates_long_details(self):
+        self.assertEqual(ck._short("every agent sees under 150 words. browser: HTTP 200, 25 words"), "every agent sees under 150 words")
+        long = "x" * 500
+        self.assertLessEqual(len(ck._short(long)), 220)
+        self.assertTrue(ck._short(long).endswith("..."))
+        self.assertEqual(ck._short("short"), "short")
+
+    def test_no_fix_placeholder_is_used_when_a_row_has_none(self):
+        rows = [{"status": "warn", "area": "onpage", "check": "x", "detail": "d", "fix": "", "group": None}]
+        self.assertEqual(ck.must_fix(rows)[0]["fix"], ck.NO_FIX)
 
 
 # ---------------------------------------------------------------------------------------------

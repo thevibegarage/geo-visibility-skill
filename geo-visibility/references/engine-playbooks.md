@@ -20,8 +20,8 @@ Behavior below reflects widely reported patterns as of late 2026 and is a starti
 
 ## Microsoft Copilot and Bing
 - Copilot and Bing's AI summaries ground their answers in Bing's index and cite it. Strong Google rankings say nothing about Bing coverage: verify the site in Bing Webmaster Tools, submit sitemaps, enable IndexNow, allow Bingbot at robots and WAF, and make sure any prerender allowlist names Bingbot.
-- Microsoft publishes a first-party **AI Performance report** in Bing Webmaster Tools (launched Feb 2026): citations in Copilot and Bing AI summaries, cited pages and grounding queries, CSV export. It is the only direct Copilot signal a site owner gets; export it monthly and feed the grounding queries into the prompt set.
-- Bing documents `nocache`/`noarchive` meta directives that limit or exclude a page from Copilot answers (reported; verify). Check that no template adds them by accident.
+- Microsoft publishes a first-party **AI Performance report** in Bing Webmaster Tools (introduced 10 Feb 2026, extended 16 Jun 2026 with Intents, Topics, Citation Share and Compare): citations in Copilot, Bing AI summaries and select partners, cited pages and a sample of grounding queries. It is the only direct Copilot signal a site owner gets; export it monthly and feed the grounding queries into the prompt set.
+- Bing's 22 Sep 2023 announcement documents `NOCACHE` (answers show only URL, title, snippet) and `NOARCHIVE` (page not included in or linked from answers; not used for training). Check that no template adds them by accident.
 - Test it as its own engine: run the frozen prompts in Copilot and log them as `Copilot` in the tracker. Full playbook, setup checklist and failure modes: `references/bing-copilot.md`.
 
 ## Claude (and Brave)
@@ -29,7 +29,7 @@ Behavior below reflects widely reported patterns as of late 2026 and is a starti
 - Claude tends to cite fewer sources and reward depth, primary sources, clear definitions and well-attributed facts over thin listicles. Original data, methodology notes and direct quotes from named experts help.
 - Because model memory matters, long-run presence in high-quality, widely-replicated sources (documentation, reputable publications, Wikipedia/Wikidata, GitHub, standards bodies) shapes what Claude "knows" about a brand even without search.
 - For developer or B2B tools: excellent public docs, a clear llms.txt or markdown-accessible docs, and an MCP server or API listing help agentic use, where Claude acts on the brand's behalf rather than just citing it. Treat "agent readiness" (clear pricing, signup path, machine-readable catalog) as part of GEO.
-- Claude's web search is reported to run on Brave Search (Anthropic lists Brave Search among its subprocessors; results have been observed to match Brave's). That makes **Brave's index** a retrieval dependency the Bing-and-Google advice misses: search the brand and its money queries on search.brave.com and check the pages appear. Brave does not offer a webmaster console comparable to Bing's (verify), so the levers are crawlable pages, links from sites Brave already indexes, and clean sitemaps.
+- Claude's web search is reported to run on Brave Search: trade coverage says Anthropic's subprocessor list names Brave Search for web search (added March 2025) and that results match Brave's. **Anthropic's own pages did not confirm this when checked on 2026-10-07** (its trust-center list is not machine-readable, and one report says the list also names TurboPuffer for web search), so treat Brave as a hypothesis to test, not a documented dependency. Cheap test: search the brand and its money queries on search.brave.com and check the pages appear; if Claude's cited sources for the same query match Brave's results, the hypothesis holds for your category. Brave does not offer a webmaster console comparable to Bing's (verify), so the levers are crawlable pages, links from sites Brave already indexes, and clean sitemaps.
 - Claude-in-the-loop test: use WebSearch in this session for the target prompts and record what it surfaces. Treat it as a proxy, not a reading of consumer Claude: the search tool, region and result format can differ from the consumer product (the same rule as Phase 1 in `SKILL.md`).
 
 ## Gemini, Google AI Overviews, AI Mode
@@ -47,13 +47,14 @@ Behavior below reflects widely reported patterns as of late 2026 and is a starti
 
 ## Other assistants and regional engines
 Coverage here is thinner and mostly unverified; use it as a checklist of what to look into per market, not as a playbook.
-- **Meta AI** (WhatsApp, Instagram, Facebook; very large in India): Meta documents `meta-externalagent` and `meta-externalfetcher` crawlers. Allow them if you want to appear; verify names in Meta's crawler documentation.
-- **Apple (Siri, Spotlight, Apple Intelligence)**: `Applebot` for search; `Applebot-Extended` is a robots token that opts out of training use only.
-- **Amazon (Alexa+)**: `Amazonbot`; verify its documented uses before blocking.
-- **Mistral Le Chat**: `MistralAI-User` for user-triggered fetches. **DuckDuckGo AI answers**: `DuckAssistBot`; DuckDuckGo search is reported to be Bing-backed.
+Crawler tokens below were checked against each vendor's documentation on 2026-10-07 unless marked otherwise.
+- **Meta AI** (WhatsApp, Instagram, Facebook; very large in India): Meta documents `meta-webindexer` (improves Meta AI search quality), `meta-externalagent` (trains AI models and indexes content; follows robots.txt) and `meta-externalfetcher` (supports agentic tasks; Meta says it may bypass robots.txt because users trigger it). Allow `meta-webindexer` and `meta-externalfetcher` if you want to be citable in Meta AI.
+- **Apple (Siri, Spotlight, Safari)**: `Applebot` crawls for search; `Applebot-Extended` is a robots token only (it does not crawl) that controls whether Applebot's data trains Apple's generative models, and disallowing it does not remove you from search results.
+- **Amazon (Alexa)**: `Amzn-SearchBot` makes content eligible for search experiences such as Alexa and is not used for generative AI training; `Amzn-User` fetches live pages for user requests and may not follow all robots.txt directives; `Amazonbot` improves Amazon products and may be used to train Amazon AI models.
+- **Mistral (Vibe)**: `MistralAI-User` fetches pages for user actions in Vibe and respects robots.txt. **DuckDuckGo AI answers**: `DuckAssistBot` gathers content for cited AI answers, respects robots.txt and is not used for training; DuckDuckGo search itself is reported to be Bing-backed.
 - **Grok, DeepSeek, You.com, Kagi and similar**: no stable site-owner controls to rely on. Run the frozen prompts there if your audience uses them, and log what is cited.
 - **Regional**: Baidu (Ernie), Naver, Yandex (Alice), Doubao, Kimi and Qwen run on their own indexes and crawlers. If the brand sells in those markets, verify each engine's crawler and webmaster tools before allocating effort; Google-first advice does not transfer.
-- `scripts/check_ai_readiness.py` reports robots rules for the documented tokens above as `info`; whether to allow them is a business choice.
+- `scripts/check_ai_readiness.py` reports robots rules for these tokens as `info`; whether to allow them is a business choice. `Bytespider` (ByteDance) is in the script from memory: no vendor documentation was found.
 
 ## Cross-engine truths
 1. **Retrievable**: not blocked, server-rendered key text, fast, in the relevant indexes (Bing, Google and, for Claude, Brave).

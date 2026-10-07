@@ -19,7 +19,7 @@ Prompt set: {{N}} prompts, {{stages}}. Runs: {{n}} per prompt for top prompts.
 
 ## 3. Technical readiness
 Score: {{pct}}% · Failures: {{n}}
-{{table from scripts/check_ai_readiness.py, failures first, each with an owner and exact fix}}
+{{the "Must fix" table from scripts/check_ai_readiness.py (failures first, then warnings), each row given an owner and a due date; then its "Worth checking" list as open points}}
 
 ## 4. 30-day action plan
 | # | Action | Why (evidence from audit) | Owner | Effort | Impact | Due |

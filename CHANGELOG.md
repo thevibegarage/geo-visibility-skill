@@ -24,17 +24,22 @@ Review fixes, a real Bing/Copilot playbook, and an automated test suite. Every f
 - `references/bing-copilot.md`: Bing Webmaster Tools setup, IndexNow, Bingbot at robots/WAF/prerender, `nocache`/`noarchive`/`nosnippet`, the AI Performance report, testing in Copilot, failure modes, checklist. Wired into `SKILL.md`, the engine playbooks, technical readiness, measurement and the evals.
 - `check_ai_readiness.py`: Googlebot and Bingbot in the render-by-agent and soft-404 probes (plus a Googlebot-vs-Bingbot parity warning); snippet/archive control warnings (`nosnippet`, `max-snippet:0`, `noarchive`, `nocache`) and bot-specific `noindex` (`googlebot`, `bingbot` metas, `X-Robots-Tag`); Bing and Google verification hints; `--indexnow-key`; `--paths` checked against the sitemap; robots rows for Applebot, Amazonbot, meta-externalagent, meta-externalfetcher, MistralAI-User, DuckAssistBot, Applebot-Extended and Bytespider (reported as `info`); `--fail-on fail`.
 - `score_tracker.py`: `--by-stage`, sentiment mix, `--domain` (derive `cited` from `cited_domains`), a warning when `--compare` runs against a different prompt set, `Copilot` and `AI Overviews` engine aliases.
+- `check_ai_readiness.py`: a **Must fix** table at the top of the output (failures first, then warnings, in the order access, render, indexing, discovery, schema, on-page; per-agent robots, WAF and soft-404 rows merged into one entry naming the agents), a **Worth checking** list of unscored open points, `--issues-only`, a `warn_count` score, and `must_fix` / `worth_checking` in the JSON. Every failing or warning row now carries a concrete fix (title, meta description, H1, Organization schema and a few others used to print an empty one). The weekly GitHub Action summary uses `--issues-only`.
+- `check_ai_readiness.py`: `Amzn-SearchBot`, `Amzn-User` and `meta-webindexer` robots rows; a malformed `--indexnow-key` is flagged without a request.
 - Technical-readiness guidance on robots.txt group semantics, snippet/archive/indexing controls, Brave's index (Claude web search is reported to use it), and other assistants and regional engines.
-- `tests/` (stdlib `unittest`, 131 tests, no network), `.github/workflows/tests.yml`, `tools/build_skill.py`.
-- Evals: assertions on every eval, and evals 6-11 (Copilot visibility, snippet controls, robots groups, Claude and Brave, tracker roll-up, India and Japan).
+- `tests/` (stdlib `unittest`, 147 tests, no network), `.github/workflows/tests.yml`, `tools/build_skill.py`.
+- Evals: assertions on every eval, and evals 6-11 (Copilot visibility, snippet controls, robots groups, Claude and Brave, tracker roll-up, India and Japan), with graded results in `geo-visibility/evals/results-2026-10-07.md`.
+- Quick answers in `SKILL.md` for snippet controls and for a bot ignoring a robots.txt Disallow; the Copilot quick answer now names the full Bing checklist.
 
 ### Changed
+- Checked against vendor pages on 2026-10-07 and corrected: Googlebot and Bingbot probes now send the evergreen Chrome-style strings; the Amazonbot string follows Amazon's documented form; Amazon's Alexa-related agents are `Amzn-SearchBot` and `Amzn-User` (Amazonbot may train Amazon AI models), not Amazonbot; Meta's search-quality crawler is `meta-webindexer`, and `meta-externalfetcher` may bypass robots.txt; Mistral's agent serves Vibe; Google-Extended has no user agent of its own. `bing-copilot.md` now reflects Microsoft's own posts: grounding queries are a sample, and Citation Share (June 2026) is observational and names no competitors.
+- The Brave dependency is now stated as a hypothesis: Anthropic's own pages did not confirm it when checked.
 - The readiness workflow propagates the script's exit code (`--fail-on fail` plus `pipefail`), fails on unreachable and homepage-error results, supports `GEO_INDEXNOW_KEY`, and documents the fork and 60-day-inactivity limits.
 - The tracker template and example CSV include Copilot and a no-search row.
 
 ### Known limits
-- The Bing/Copilot guidance and the new crawler user-agent strings were not verified against vendor documentation; see the README table.
-- Evals 6-11 have not been run against an agent. The checker has been run on two live sites but not on WordPress, Next.js or Shopify stacks.
+- Some Bing/Copilot details are still trade-press only (verification methods, the evergreen Bingbot string, the IndexNow-preference and schema statements) and `Bytespider` has no vendor documentation; see the README table.
+- Evals 6-11 were run once or twice by sub-agents (28 of 34 assertions fully met; see `geo-visibility/evals/results-2026-10-07.md`); evals 1-5 were not re-run, and skill triggering from natural phrasing is untested. The checker has been run on two live sites but not on WordPress, Next.js or Shopify stacks.
 - The `v0.1.0` release asset predates v0.1.1 and v0.1.2: rebuild with `python3 tools/build_skill.py` and publish a new release.
 
 ## v0.1.1 — 2026-10-06

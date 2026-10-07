@@ -57,4 +57,4 @@ jobs:
           # $PATHS is intentionally unquoted so it splits into separate arguments; globbing is off so "*" stays literal
           set -f
           python3 geo-visibility/scripts/check_ai_readiness.py "$DOMAIN" --paths $PATHS \
-            "${args[@]}" --json readiness.json --fail-on fail | tee -a "$GITHUB_STEP_SUMMARY"
+            "${args[@]}" --json readiness.json --fail-on fail --issues-only | tee -a "$GITHUB_STEP_SUMMARY"
