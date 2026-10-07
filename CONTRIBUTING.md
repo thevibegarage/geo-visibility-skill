@@ -7,7 +7,7 @@ Thanks for helping keep this skill sharp. The fastest-decaying parts are crawler
 - **Engine updates with sources.** If OpenAI, Anthropic, Perplexity, Google or Microsoft change a crawler, an index dependency or citation behavior, open a PR against `references/engine-playbooks.md` or `references/technical-readiness.md` with a link to the vendor doc and the date you verified it.
 - **Real audit results.** Anonymized tracker CSVs and what moved (or didn't) after changes. These turn hedged claims into evidence.
 - **New vertical playbooks** for `references/verticals.md` (e.g. healthcare, real estate, D2C in specific markets).
-- **Script fixes** — both scripts are standard-library-only on purpose; keep them that way.
+- **Script fixes** — both scripts are standard-library-only on purpose and must stay Python 3.8-compatible; keep them that way.
 - **Translations** of the prompt-audit templates for non-English markets.
 
 ## What we'll reject
@@ -19,7 +19,7 @@ Thanks for helping keep this skill sharp. The fastest-decaying parts are crawler
 ## How
 
 1. Fork, branch, edit.
-2. If you touch a script, run it against good, empty and malformed input (see `assets/visibility-tracker.csv` for the expected header).
+2. If you touch a script, template or reference map, run the suite: `python3 -m unittest discover -s tests` (standard library only; `pip install pyyaml` adds the workflow-syntax test). Add a regression test for every bug you fix, and prove it fails on the old code. Tests run against a local mock site, so they need no network.
 3. If you touch `SKILL.md`, keep it under ~500 lines and keep the reference map accurate.
 4. Note in your PR what you verified and on what date.
 

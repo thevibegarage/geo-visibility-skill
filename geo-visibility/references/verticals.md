@@ -22,7 +22,7 @@ Pick the profile closest to the brand and apply its emphasis. The workflow in SK
 - Keep price, availability and variants consistent between site, feed and marketplaces. Mismatches get an item dropped or misquoted.
 
 ## Local and service businesses
-- Highest-leverage: Google Business Profile, reviews and owner replies, consistent NAP, local pages with services and areas, local directories, Apple Business Connect and Bing Places, community and press mentions.
+- Highest-leverage: Google Business Profile, reviews and owner replies, consistent NAP, local pages with services and areas, local directories, Apple Business Connect and Bing Places (Copilot and Bing answers draw on it; see `bing-copilot.md`), community and press mentions.
 - Prompts are location-bound ("near me", neighborhood, city). Audit with the actual city and device location settings.
 
 ## Agencies and professional services
@@ -42,6 +42,7 @@ Pick the profile closest to the brand and apply its emphasis. The workflow in SK
 - Do not generate medical, legal or financial claims for the brand; require the owner and a qualified reviewer to supply and approve them.
 
 ## Non-US and multilingual markets
+- `scripts/check_ai_readiness.py` counts Chinese, Japanese, Korean and Thai by characters (about two per word), so its word-count thresholds are approximate for those sites; judge a flagged page by what it should say, not by the number.
 - Test prompts in the languages and scripts real buyers use (including code-mixed text such as Hinglish) and with local phrasing, currencies and regulations.
 - Localize pages properly (not machine-translated filler), use hreflang, keep entity facts identical across languages, and seek local sources: regional publications, directories, marketplaces, forums.
 - Engines differ by country in availability and index; verify which assistants and search surfaces matter in the target market before allocating effort.

@@ -23,19 +23,23 @@ AI visibility is noisy. Good measurement means a frozen prompt set, repeat runs,
 | Assisted conversions | Conversions from AI-referred or AI-influenced visits | Business impact |
 | Branded search lift | Growth in branded queries and direct traffic | AI exposure often shows up as brand searches |
 | Source coverage | % of top-cited sources where the brand is present | Leading indicator |
+| Copilot/Bing AI citations | Citations and cited pages from Bing Webmaster Tools' AI Performance report | The only first-party AI-citation count; export monthly |
 
 ## Prompt-set tracking
 Use `assets/visibility-tracker-template.md` to store results (copy into Sheets/Excel if the user prefers; offer to build a spreadsheet). Freeze the prompt list and add new prompts as a separate cohort so trends stay comparable. Record engine, mode (search on/off), date, location, run number, brand mentioned/cited, position, sentiment, accuracy errors, cited domains.
+
+Roll the CSV up with `python scripts/score_tracker.py tracker.csv --brand "<Brand>" --domain <brand-domain> --by-stage`. It accepts 1/0 or TRUE/FALSE (spreadsheet exports), reports `search` and `no-search` runs separately, derives `cited` from `cited_domains` when `--domain` is given, prints a sentiment mix and a per-stage table, and warns when `--compare` is run against a different prompt set. Engines in the tracker: ChatGPT, Claude, Gemini, Copilot, Perplexity, AI Overviews, plus any assistant that matters in the market.
 
 ## Analytics setup
 - In GA4 (or equivalent) create a channel group for AI referrals using referrer matching for chatgpt.com, chat.openai.com, perplexity.ai, gemini.google.com, copilot.microsoft.com, claude.ai, and similar. Referrer domains change; review quarterly.
 - Many AI visits arrive with no referrer (shown as direct). Track branded and direct lift alongside referrals and add a "How did you hear about us?" free-text field with "ChatGPT/AI assistant" as an option.
 - Server logs: count requests from AI user-agents (search indexers and user fetchers) to see which pages are being retrieved and whether any are blocked. Bursts of user-fetch hits indicate real users asking about those pages.
-- Search Console and Bing Webmaster Tools: watch impressions, clicks, and queries; Bing's reporting on AI-related performance, where available, is worth checking.
+- Search Console: watch impressions, clicks, and queries on AI-feature surfaces; it does not report Copilot or ChatGPT citations.
+- Bing Webmaster Tools: besides search performance, open the **AI Performance report** (launched Feb 2026): citations in Copilot and Bing AI summaries, cited pages, and grounding queries, CSV export only at launch. Export it monthly to keep your own history, add the grounding queries to the prompt set as a new cohort, and report it as citation counts, not share of voice. See `bing-copilot.md`.
 - Tag landing pages built for GEO so you can attribute lift.
 
 ## Cadence and reporting
-- Weekly (light): server-log check for blocked AI agents, new errors, spot-check 5 money prompts.
+- Weekly (light): server-log check for blocked AI agents (including Bingbot), new errors, spot-check 5 money prompts. The scheduled GitHub Action in this repo runs the readiness check weekly and fails on a refused crawler, a missing sitemap or an accidental `noindex`.
 - Monthly: full prompt-set re-run, KPI table, changes shipped, what moved, next experiments.
 - Quarterly: refresh the prompt set (keep the frozen core), review engine changes, revisit the target source list.
 
