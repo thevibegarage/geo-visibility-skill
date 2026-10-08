@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (planned v0.2.0)
+## v0.2.0 — 2026-10-08
 
 A showpiece README with a reproducible demo, plus two output fixes found by running the checker on live sites.
 
