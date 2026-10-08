@@ -28,7 +28,8 @@ row in their group, so a wall of trivial passes cannot hide a failure.
 
 Crawler names change. Treat the AGENTS table as a starting point and verify against vendor docs.
 Output: a "Must fix" table first (failures, then warnings, each with a concrete fix; per-agent rows of one kind
-are merged), then unscored open points, then every check. --issues-only hides passing checks and routine "allowed" rows. The JSON output
+are merged), then unscored open points, then every check. --issues-only replaces the last table with "Other notes":
+only the rows the first two sections do not already show. The JSON output
 carries the same lists as "must_fix" and "worth_checking".
 Exit codes: 0 ok, 1 failures found (with --fail-on fail), 2 unreachable, 3 homepage returned an
 HTTP error (checks stop: there is no content to assess).
@@ -558,8 +559,18 @@ def must_fix(findings):
     Per-agent rows of one group (robots, WAF, soft 404) with the same status become a single entry that names the agents.
     """
     out, merged = [], {}
+    rank = {"warn": 1, "fail": 2}
+    home_render = next((f for f in findings if f["check"] == "render by agent: /" and f["status"] in rank), None)
     for f in findings:
         if f["status"] not in ("fail", "warn"):
+            continue
+        # The homepage word count and the homepage render-by-agent row describe the same page: list it once,
+        # under the more severe of the two (render-by-agent wins a tie because it also names the agents).
+        if f["check"] == "visible text in raw HTML" and home_render and rank[home_render["status"]] >= rank[f["status"]]:
+            continue
+        if f["check"] == "render by agent: /" and any(
+                g["check"] == "visible text in raw HTML" and g["status"] in rank and rank[g["status"]] > rank[f["status"]]
+                for g in findings):
             continue
         key = (f["group"], f["status"])
         if f["group"] in GROUP_LABELS:
@@ -576,7 +587,7 @@ def must_fix(findings):
         out.append(entry)
     for e in out:
         if e["agents"]:
-            e["detail"] = ", ".join(e["agents"]) + f" ({e['detail']})"
+            e["detail"] = ", ".join(e["agents"]) + f": {e['detail']}"
     out.sort(key=lambda e: (0 if e["status"] == "fail" else 1, AREA_ORDER.get(e["area"], 9)))  # stable: keeps check order
     return out
 
@@ -841,13 +852,20 @@ def to_markdown(res, issues_only=False):
     if extra:
         out += ["", "## Worth checking (not scored)", ""]
         out += [f"- **{_cell(e['check'])}**: {_cell(e['detail'])} \u2014 {_cell(e['fix'])}" for e in extra]
-    routine = lambda f: f["status"] == "pass" or (f["status"] == "info" and f["detail"] == "allowed")
-    rows = [f for f in res["findings"] if not (issues_only and routine(f))]
+    # --issues-only leaves what the two sections above do not already show: passing and routine "allowed" rows,
+    # every warning and failure (listed in Must fix) and every info row that carries an action (Worth checking)
+    covered = lambda f: (f["status"] in ("pass", "fail", "warn") or (f["status"] == "info" and (f["detail"] == "allowed" or f["fix"])))
+    rows = [f for f in res["findings"] if not (issues_only and covered(f))]
     hidden = len(res["findings"]) - len(rows)
-    out += ["", f"## All checks{f' ({hidden} routine checks hidden)' if hidden else ''}", "",
-            "| Area | Check | Status | Detail | Fix |", "|---|---|---|---|---|"]
-    for f in rows:
-        out.append(f"| {_cell(f['area'])} | {_cell(f['check'])} | {f['status']} | {_cell(f['detail'])} | {_cell(f['fix'])} |")
+    if issues_only:
+        out += ["", f"## Other notes ({hidden} checks hidden: passing, routine, or listed above)", ""]
+    else:
+        out += ["", "## All checks", ""]
+    if rows:
+        out += ["| Area | Check | Status | Detail | Fix |", "|---|---|---|---|---|"]
+        out += [f"| {_cell(f['area'])} | {_cell(f['check'])} | {f['status']} | {_cell(f['detail'])} | {_cell(f['fix'])} |" for f in rows]
+    else:
+        out.append("None.")
     return "\n".join(out)
 
 
@@ -860,7 +878,8 @@ def main(argv=None):
     ap.add_argument("--fail-on", choices=("none", "fail"), default="none",
                     help="exit 1 when any check fails (for CI)")
     ap.add_argument("--issues-only", action="store_true",
-                    help="hide passing checks and routine 'allowed' rows from the All checks table (the JSON output keeps every check)")
+                    help="short report: Must fix, Worth checking and a few other notes, without repeating them or listing passing checks "
+                         "(the JSON output keeps every check)")
     a = ap.parse_args(argv)
     res = check(a.domain, a.paths, a.indexnow_key)
     print(to_markdown(res, a.issues_only))

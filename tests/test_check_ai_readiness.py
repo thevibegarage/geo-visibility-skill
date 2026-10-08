@@ -586,7 +586,7 @@ class MustFix(unittest.TestCase):
         h = lambda p, ua: (403, {}, "no") if p == "/" and ("Googlebot" in ua or "OAI-SearchBot" in ua) else None
         with good_site(handler=h) as s:
             res = ck.check(s.base, [])
-        waf = [(e["status"], e["detail"].split(" (")[0]) for e in res["must_fix"] if e["check"].startswith("WAF refuses")]
+        waf = [(e["status"], e["detail"].split(": ")[0]) for e in res["must_fix"] if e["check"].startswith("WAF refuses")]
         self.assertEqual(sorted(waf), [("fail", "OAI-SearchBot"), ("warn", "Googlebot")])
 
     def test_markdown_leads_with_the_must_fix_table(self):
@@ -603,22 +603,50 @@ class MustFix(unittest.TestCase):
         self.assertIn("## Must fix (0)", md)
         self.assertIn("Nothing failed or warned.", md)
 
-    def test_issues_only_hides_passing_rows_but_json_keeps_everything(self):
+    def test_issues_only_does_not_repeat_what_must_fix_and_worth_checking_already_show(self):
         with self.broken() as s, tempfile.TemporaryDirectory() as d:
             path = os.path.join(d, "r.json")
             code, full = run_main(ck, [s.base])
             code, short = run_main(ck, [s.base, "--issues-only", "--json", path])
             with open(path) as fh:
                 data = json.load(fh)
-        tail = short.split("## All checks")[1]
-        self.assertNotIn("| pass |", tail)
-        self.assertRegex(tail.splitlines()[0], r"\(\d+ routine checks hidden\)")
-        self.assertNotIn("| info | allowed |", tail)
-        self.assertIn("| pass |", full.split("## All checks")[1])
         self.assertIn("## Must fix", short)
-        self.assertGreater(sum(1 for f in data["findings"] if f["status"] == "pass"), 0)
+        self.assertNotIn("## All checks", short)
+        tail = short.split("## Other notes")[1]
+        self.assertRegex(tail.splitlines()[0], r"\(\d+ checks hidden: passing, routine, or listed above\)")
+        for status in ("pass", "fail", "warn"):
+            self.assertNotIn(f"| {status} |", tail)
+        self.assertNotIn("| info | allowed |", tail)
+        self.assertIn("| pass |", full.split("## All checks")[1])  # the default output is unchanged
+        self.assertGreater(sum(1 for f in data["findings"] if f["status"] == "pass"), 0)  # JSON keeps everything
         self.assertTrue(data["must_fix"])
         self.assertIn("worth_checking", data)
+
+    def test_issues_only_with_nothing_left_says_none(self):
+        res = {"domain": "https://x.example", "scores": {"technical_readiness_pct": 100, "fail_count": 0, "warn_count": 0},
+               "findings": [{"area": "access", "check": "robots.txt present", "status": "pass", "detail": "HTTP 200", "fix": "", "group": None}],
+               "must_fix": [], "worth_checking": []}
+        md = ck.to_markdown(res, issues_only=True)
+        self.assertIn("## Must fix (0)", md)
+        self.assertRegex(md.split("## Other notes")[1], r"\n\nNone\.$")
+
+    def test_homepage_is_listed_once_when_two_rows_describe_the_same_thin_page(self):
+        """Regression (seen on a live site): 'visible text in raw HTML' and 'render by agent: /' both listed the same finding."""
+        with good_site(extra={"/": html_page(words=80)}) as s:
+            res = ck.check(s.base, [])
+        checks = [e["check"] for e in res["must_fix"]]
+        self.assertIn("render by agent: /", checks)
+        self.assertNotIn("visible text in raw HTML", checks)
+
+    def test_the_more_severe_homepage_row_is_the_one_that_survives(self):
+        rows = [{"status": "fail", "area": "render", "check": "visible text in raw HTML", "detail": "d1", "fix": "f1", "group": None},
+                {"status": "warn", "area": "render", "check": "render by agent: /", "detail": "d2", "fix": "f2", "group": None}]
+        self.assertEqual([e["check"] for e in ck.must_fix(rows)], ["visible text in raw HTML"])
+        rows[0]["status"] = "warn"
+        self.assertEqual([e["check"] for e in ck.must_fix(rows)], ["render by agent: /"])
+        rows[0]["status"] = "warn"
+        rows[1]["status"] = "fail"
+        self.assertEqual([e["check"] for e in ck.must_fix(rows)], ["render by agent: /"])
 
     def test_issues_only_still_shows_a_blocked_training_agent(self):
         robots = (200, {"Content-Type": "text/plain"}, "User-agent: GPTBot\nDisallow: /\n")

@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased (planned v0.2.0)
+
+A showpiece README with a reproducible demo, plus two output fixes found by running the checker on live sites.
+
+### Added
+- `examples/demo_site.py`: a small fictional site ("Meridian CRM", standard library only) with flaws planted on purpose: a crawler disallowed in robots.txt, a crawler refused by a bot rule, an empty app shell, dynamic rendering by user agent, a page full for Googlebot but empty for Bingbot, `nosnippet`, no JSON-LD and identical sitemap dates.
+- `examples/demo-site-output.md`: real, unedited checker output on that site, a words-per-agent table, and a map of planted flaws to Must fix rows. `tools/make_demo_report.py` regenerates it, and a test fails if the committed file drifts from what the tool prints.
+- README: hero section, a "See it work" excerpt of that output (verbatim, checked by a test), a quick start, a flowchart of the six phases, a what's-in-the-box table, and a Tests badge.
+- Tests for the demo, the README and the examples (links resolve, the excerpt is verbatim, counts match, no real company named in the examples, the claimed test count is current).
+
+### Changed
+- `check_ai_readiness.py --issues-only` now ends with a short **Other notes** list instead of repeating warnings and failures already shown in **Must fix** and info rows already shown in **Worth checking**. The default output is unchanged.
+- Merged Must fix rows read "agent: detail" instead of nesting the detail in parentheses.
+- `examples/sample-report.md` (still illustrative, with invented numbers) now uses the checker's Must fix layout and includes Copilot.
+- README roadmap: the v0.2 items that shipped are removed; next up is v0.3.
+
+### Fixed
+- **Must fix** listed the same thin homepage twice ("visible text in raw HTML" and "render by agent: /"). It is now listed once, under the more severe of the two rows.
+
 ## v0.1.2 — 2026-10-07
 
 Review fixes, a real Bing/Copilot playbook, and an automated test suite. Every fix below has a regression test that fails on v0.1.1.

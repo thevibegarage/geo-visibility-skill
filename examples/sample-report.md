@@ -1,12 +1,12 @@
 # Sample output: AI Search Visibility Report
 
-> **This is an illustrative example** using a fictional brand ("Meridian CRM") so no real company's data is exposed. Structure and depth match what the skill produces on a real engagement. Numbers are invented.
+> **This is an illustrative example** using a fictional brand ("Meridian CRM") so no real company's data is exposed. Structure and depth match what the skill produces on a real engagement. **Every number here is invented.** For genuine, unedited output of the readiness checker (on a fictional demo site you can run yourself), see [demo-site-output.md](demo-site-output.md).
 
 ---
 
 # AI Search Visibility Report: Meridian CRM
 
-Prepared 2026-10-05 · Domain: meridiancrm.example · Category: CRM for mid-size agencies · Engines tested: ChatGPT, Claude, Perplexity, Gemini
+Prepared 2026-10-05 · Domain: meridiancrm.example · Category: CRM for mid-size agencies · Engines tested: ChatGPT, Claude, Perplexity, Gemini, Copilot
 
 **Assumptions and limits:** 32 prompts, 1–3 runs each, search mode on, tested from one location. AI answers vary by run, user, location and model version; this is a point-in-time baseline, not a verdict.
 
@@ -23,6 +23,7 @@ Prepared 2026-10-05 · Domain: meridiancrm.example · Category: CRM for mid-size
 | Claude | 32 | 25 | 6 | 2.8 | 17 |
 | Perplexity | 32 | 28 | 9 | 2.5 | 19 |
 | Gemini | 32 | 16 | 3 | 3.6 | 11 |
+| Copilot | 32 | 12 | 3 | 3.9 | 8 |
 
 **Top cited domains in the category** (the off-site target list):
 | Rank | Domain | Type | Cited | You present? | Action |
@@ -39,14 +40,19 @@ Prepared 2026-10-05 · Domain: meridiancrm.example · Category: CRM for mid-size
 | ChatGPT | "Starts at $49/user" | $29/user since Jan 2026 | Stale Capterra entry | Update profile |
 | Gemini | "No API access" | Full REST API on all tiers | Old comparison post | Request correction + publish API page |
 
-## 3. Technical readiness — 68%, 3 failures
-| Check | Status | Fix |
-|---|---|---|
-| robots.txt allows search/user-fetch agents | ✅ pass | — |
-| Key text in initial HTML | ❌ fail | SSR /pricing, /features |
-| Organization schema | ❌ fail | Add JSON-LD (template in assets/) |
-| Bing indexed | ⚠️ partial | Submit sitemap, enable IndexNow |
-| Visible dates + authors on content | ❌ fail | Add bylines |
+## 3. Technical readiness: 68%, 2 failures, 4 warnings
+This is the checker's **Must fix** table (failures first, each row with a concrete fix). The values are invented; the layout follows the real output, with its Detail column folded into Issue (see the [demo output](demo-site-output.md)).
+
+| # | Severity | Area | Issue | Fix |
+|---|---|---|---|---|
+| 1 | fail | render | `/pricing` and `/features`: every agent sees 12 words (empty app shell) | Server-render or statically render these pages |
+| 2 | fail | schema | No JSON-LD on the homepage | Add Organization and WebSite JSON-LD (template in `assets/`) |
+| 3 | warn | render | Googlebot receives 640 words on `/blog/crm-for-agencies`, Bingbot receives 14 | Add `bingbot` to the prerender allowlist |
+| 4 | warn | discovery | Sitemap `lastmod` identical on 71% of entries | Emit real edit dates or omit `lastmod` |
+| 5 | warn | indexing | `nosnippet` set by an SEO plugin on the blog template | Remove it, or scope it with `data-nosnippet` |
+| 6 | warn | access | robots.txt returns 404, so crawlers treat it as allow-all | Publish a robots.txt (template in `assets/`) |
+
+**Worth checking (not scored):** Bing Webmaster Tools verification not detectable from the page, so confirm it and submit the sitemap; enable IndexNow; read the AI Performance report for Copilot citations.
 
 ## 4. 30-day action plan (excerpt)
 | # | Action | Owner | Effort | Due |

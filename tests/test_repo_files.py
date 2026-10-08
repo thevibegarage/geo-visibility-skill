@@ -60,6 +60,86 @@ class SkillManifest(unittest.TestCase):
                 self.assertTrue(found, f"{n} mentions missing {target}")
 
 
+class ReadmeAndExamples(unittest.TestCase):
+    DEMO = os.path.join(ROOT, "examples", "demo-site-output.md")
+
+    def docs(self):
+        out = [os.path.join(ROOT, n) for n in ("README.md", "CONTRIBUTING.md", "CHANGELOG.md")]
+        out += [os.path.join(ROOT, "examples", n) for n in os.listdir(os.path.join(ROOT, "examples")) if n.endswith(".md")]
+        return out
+
+    def test_relative_links_resolve(self):
+        for path in self.docs():
+            base = os.path.dirname(path)
+            # "../../releases" style links are GitHub-relative URLs (they resolve on github.com, not on disk)
+            for target in re.findall(r"\]\((?!https?:|#|mailto:|\.\./\.\./)([^)\s#]+)", read(path)):
+                resolved = os.path.normpath(os.path.join(base, target))
+                self.assertTrue(os.path.exists(resolved), f"{os.path.relpath(path, ROOT)} links to missing {target}")
+
+    def test_readme_excerpt_is_verbatim_from_the_demo_output(self):
+        """The README shows 'real, unedited output': every table row it shows must exist in the demo file."""
+        demo = read(self.DEMO)
+        rows = [l for l in read(ROOT, "README.md").splitlines() if re.match(r"\| (\d+ \||`/|Page \|)", l) or l.startswith("Technical readiness:")]
+        self.assertGreaterEqual(len(rows), 12)  # score line + 8 Must fix rows + the words-per-agent table
+        for row in rows:
+            self.assertIn(row, demo, f"README row not found in the demo output: {row[:80]}")
+
+    def test_numbers_quoted_in_the_readme_prose_come_from_the_demo_output(self):
+        prose = read(ROOT, "README.md").split("`/features` shows why")[1].split("(The prompt-audit side")[0]
+        demo = read(self.DEMO)
+        for number in re.findall(r"\b\d{3}\b", prose):
+            self.assertIn(number, demo, f"{number} is quoted in the README but is not in the demo output")
+
+    def test_readme_must_fix_count_matches_its_rows(self):
+        text = read(ROOT, "README.md")
+        n = int(re.search(r"#### Must fix \((\d+)\)", text).group(1))
+        block = text.split("#### Must fix")[1].split("It tests the way")[0]
+        self.assertEqual(len(re.findall(r"^\| \d+ \| (?:fail|warn) \|", block, re.M)), n)
+
+    def test_demo_output_has_the_documented_shape(self):
+        demo = read(self.DEMO)
+        self.assertIn("Real, unedited output", demo)
+        self.assertIn("check_ai_readiness.py", demo)
+        self.assertIn("fictional", demo)
+        self.assertRegex(demo, r"\*\*[0-9]{2,3}%\*\* \(\d+ failures, \d+ warnings\)")
+        n = int(re.search(r"## Must fix \((\d+)\)", demo).group(1))
+        self.assertEqual(len(re.findall(r"^\| \d+ \| (?:fail|warn) \|", demo.split("## Worth checking")[0], re.M)), n)
+        for section in ("## Worth checking (not scored)", "## Other notes", "## Words each agent received", "## What was planted"):
+            self.assertIn(section, demo)
+
+    def test_illustrative_report_is_clearly_labelled_and_points_to_the_demo(self):
+        text = read(ROOT, "examples", "sample-report.md")
+        self.assertIn("illustrative example", text)
+        self.assertIn("Every number here is invented", text)
+        self.assertIn("demo-site-output.md", text)
+
+    def test_no_real_company_is_the_subject_of_any_example_or_test(self):
+        """Examples show a fictional site only. (The domain is built from parts so this file does not contain it.)"""
+        domain = "garage" + "labstech"
+        allowed = ("Built and open-sourced by", "Full audit on a real brand", "Copyright (c)", "\u00a9 2026")
+        for folder in ("examples", "tools", "tests", os.path.join("geo-visibility", "evals"), os.path.join("geo-visibility", "references")):
+            for dirpath, _, names in os.walk(os.path.join(ROOT, folder)):
+                for n in names:
+                    if n.endswith((".md", ".py", ".json", ".txt", ".csv")):
+                        self.assertNotIn(domain, read(dirpath, n).lower(), os.path.join(dirpath, n))
+        for name in ("README.md", "CHANGELOG.md"):
+            for line in read(ROOT, name).splitlines():
+                if domain in line.lower():
+                    self.assertTrue(any(a in line for a in allowed), f"{name} names a real site outside attribution: {line[:100]}")
+
+    def test_mermaid_diagram_is_present_and_balanced(self):
+        text = read(ROOT, "README.md")
+        block = re.search(r"```mermaid\n(.*?)```", text, re.S)
+        self.assertIsNotNone(block)
+        self.assertIn("flowchart", block.group(1))
+        self.assertEqual(block.group(1).count("["), block.group(1).count("]"))
+
+    def test_readme_test_count_is_not_stale(self):
+        claimed = int(re.search(r"\u2705 (\d+) tests", read(ROOT, "README.md")).group(1))
+        actual = unittest.TestLoader().discover(os.path.dirname(os.path.abspath(__file__))).countTestCases()
+        self.assertEqual(claimed, actual, "update the test count in README.md")
+
+
 class Evals(unittest.TestCase):
     def test_shape(self):
         data = json.loads(read(SKILL, "evals", "evals.json"))
