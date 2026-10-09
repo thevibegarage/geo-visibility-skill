@@ -1,0 +1,26 @@
+{
+  "name": "geo-visibility",
+  "displayName": "GEO Visibility",
+  "version": "0.2.0",
+  "description": "Audit and improve how a brand is found, cited and recommended in ChatGPT, Claude, Gemini, Perplexity, Copilot and Google AI Overviews, while keeping classic SEO strong. Includes a per-agent readiness checker, a prompt-audit tracker and playbooks for Bing and Copilot.",
+  "author": {
+    "name": "Garage Labs Technologies",
+    "url": "https://www.garagelabstech.com"
+  },
+  "homepage": "https://github.com/thevibegarage/geo-visibility-skill",
+  "repository": "https://github.com/thevibegarage/geo-visibility-skill",
+  "license": "MIT",
+  "keywords": [
+    "geo",
+    "generative-engine-optimization",
+    "aeo",
+    "ai-search",
+    "seo",
+    "llm-visibility",
+    "bing",
+    "copilot",
+    "robots-txt",
+    "schema"
+  ],
+  "skills": ["./geo-visibility/"]
+}

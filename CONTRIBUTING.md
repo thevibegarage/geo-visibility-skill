@@ -23,6 +23,15 @@ Thanks for helping keep this skill sharp. The fastest-decaying parts are crawler
 3. If you touch `SKILL.md`, keep it under ~500 lines and keep the reference map accurate.
 4. Note in your PR what you verified and on what date.
 
+## Releasing
+
+A release moves four things together, and tests fail if they drift:
+
+1. In `CHANGELOG.md`, rename the `Unreleased` heading to `## vX.Y.Z — date`.
+2. Set `version` in `.claude-plugin/plugin.json` to `X.Y.Z`. Setting a version pins plugin users until it changes, so forgetting this means nobody receives the release.
+3. Run `claude plugin validate --strict .` and `claude plugin validate --strict .claude-plugin/plugin.json` (a clean run prints `Validation passed`), then `python3 -m unittest discover -s tests`.
+4. Build `python3 tools/build_skill.py`, publish a GitHub release tagged `vX.Y.Z` with `dist/geo-visibility.skill` attached, and use the changelog entry as the notes.
+
 ## Evidence standards
 
 The skill grades claims into high / medium / low confidence (`references/evidence-and-claims.md`). PRs that move a claim up a tier need a source: a vendor doc, a controlled test, or a replicated study. PRs that move a claim down just need a good argument.

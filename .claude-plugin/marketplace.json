@@ -1,0 +1,18 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "geo-visibility",
+  "description": "GEO Visibility: audit and improve how a brand is found, cited and recommended by AI search engines. Free and open source.",
+  "owner": {
+    "name": "Garage Labs Technologies",
+    "url": "https://www.garagelabstech.com"
+  },
+  "plugins": [
+    {
+      "name": "geo-visibility",
+      "source": "./",
+      "description": "Audit and improve how a brand is found, cited and recommended in ChatGPT, Claude, Gemini, Perplexity, Copilot and Google AI Overviews. Per-agent readiness checker, prompt-audit tracker, Bing and Copilot playbook.",
+      "category": "marketing",
+      "tags": ["geo", "aeo", "ai-search", "seo", "bing", "copilot"]
+    }
+  ]
+}

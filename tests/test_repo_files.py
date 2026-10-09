@@ -116,8 +116,10 @@ class ReadmeAndExamples(unittest.TestCase):
     def test_no_real_company_is_the_subject_of_any_example_or_test(self):
         """Examples show a fictional site only. (The domain is built from parts so this file does not contain it.)"""
         domain = "garage" + "labstech"
-        allowed = ("Built and open-sourced by", "Full audit on a real brand", "Copyright (c)", "\u00a9 2026")
-        for folder in ("examples", "tools", "tests", os.path.join("geo-visibility", "evals"), os.path.join("geo-visibility", "references")):
+        allowed = ("Built and open-sourced by", "Full audit on a real brand", "Copyright (c)", "\u00a9 2026",
+                   "(https://www." + domain + ".com) can help")  # the labelled services note
+        # the whole skill folder is included: nothing the skill reads, prints or generates may name a company
+        for folder in ("examples", "tools", "tests", "geo-visibility"):
             for dirpath, _, names in os.walk(os.path.join(ROOT, folder)):
                 for n in names:
                     if n.endswith((".md", ".py", ".json", ".txt", ".csv")):
@@ -126,6 +128,39 @@ class ReadmeAndExamples(unittest.TestCase):
             for line in read(ROOT, name).splitlines():
                 if domain in line.lower():
                     self.assertTrue(any(a in line for a in allowed), f"{name} names a real site outside attribution: {line[:100]}")
+
+    def test_services_note_is_clearly_labelled_and_only_in_the_readme(self):
+        """The maintainers' services offer is allowed in the README, labelled as such, and nowhere the skill can reach."""
+        readme = read(ROOT, "README.md")
+        self.assertIn("\n## Need help implementing this?\n", readme)
+        section = readme.split("## Need help implementing this?")[1].split("\n## ")[0]
+        self.assertIn("services offer from the maintainers", section)
+        self.assertIn("nothing the skill prints, recommends or generates ever promotes it", section)
+        self.assertIn("free and MIT licensed", section)
+        self.assertEqual(readme.count("Need help implementing this?"), 1)
+        for dirpath, _, names in os.walk(SKILL):
+            for n in names:
+                if n.endswith((".md", ".py", ".json", ".txt", ".csv")):
+                    text = read(dirpath, n)
+                    self.assertNotIn("Need help implementing", text, os.path.join(dirpath, n))
+
+    def test_checker_output_never_promotes_anyone(self):
+        """Run the checker on the demo site and scan everything it prints (markdown and JSON) for promotional text."""
+        import importlib.util, sys
+        spec = importlib.util.spec_from_file_location("demo_site_promo", os.path.join(ROOT, "examples", "demo_site.py"))
+        demo = importlib.util.module_from_spec(spec)
+        sys.modules["demo_site_promo"] = demo
+        spec.loader.exec_module(demo)
+        from helpers import ck
+        server = demo.serve_in_background(0)
+        try:
+            res = ck.check(f"http://127.0.0.1:{server.server_address[1]}", ["/pricing", "/features"])
+        finally:
+            server.shutdown()
+            server.server_close()
+        printed = (ck.to_markdown(res) + ck.to_markdown(res, issues_only=True) + json.dumps(res)).lower()
+        for needle in ("garage" + "labs", "need help implementing", "try our", "sign up", "powered by", "upgrade to"):
+            self.assertNotIn(needle, printed, needle)
 
     def test_mermaid_diagram_is_present_and_balanced(self):
         text = read(ROOT, "README.md")
