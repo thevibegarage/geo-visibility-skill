@@ -1,0 +1,285 @@
+{
+  "about": "Prompts for the simulated activation test (tools/trigger_sim.py). 'fire' = the geo-visibility skill should be chosen; 'no-fire' = it should not (another skill, or none, should handle it). The split was fixed before any run: the skill description may be tuned using 'dev' failures only; 'test' is the held-out estimate and must not be used to tune.",
+  "prompts": [
+    {
+      "id": 1,
+      "split": "dev",
+      "expect": "fire",
+      "prompt": "Why doesn't ChatGPT ever mention our brand when people ask for CRM tools?",
+      "note": ""
+    },
+    {
+      "id": 2,
+      "split": "dev",
+      "expect": "fire",
+      "prompt": "Run an AI visibility audit on acme.io",
+      "note": ""
+    },
+    {
+      "id": 3,
+      "split": "dev",
+      "expect": "fire",
+      "prompt": "make us show up in Perplexity and Gemini answers",
+      "note": ""
+    },
+    {
+      "id": 4,
+      "split": "dev",
+      "expect": "fire",
+      "prompt": "Does our robots.txt block GPTBot or ClaudeBot? We want to be cited but not trained on.",
+      "note": ""
+    },
+    {
+      "id": 5,
+      "split": "dev",
+      "expect": "fire",
+      "prompt": "Do we need an llms.txt file?",
+      "note": ""
+    },
+    {
+      "id": 6,
+      "split": "dev",
+      "expect": "fire",
+      "prompt": "How is our share of voice in AI answers compared with our competitors?",
+      "note": ""
+    },
+    {
+      "id": 7,
+      "split": "dev",
+      "expect": "fire",
+      "prompt": "Copilot never recommends us even though we rank well on Google. What's wrong?",
+      "note": ""
+    },
+    {
+      "id": 8,
+      "split": "dev",
+      "expect": "fire",
+      "prompt": "Is Googlebot seeing the same page as Bingbot on our site? We use a prerender service for our React app.",
+      "note": ""
+    },
+    {
+      "id": 9,
+      "split": "dev",
+      "expect": "fire",
+      "prompt": "set up IndexNow and Bing Webmaster Tools so AI assistants can find us",
+      "note": ""
+    },
+    {
+      "id": 10,
+      "split": "dev",
+      "expect": "fire",
+      "prompt": "ChatGPT describes our pricing wrongly, it says we're cheaper than we are. How do we fix that?",
+      "note": ""
+    },
+    {
+      "id": 11,
+      "split": "test",
+      "expect": "fire",
+      "prompt": "SEO for AI: how do we get cited by LLMs?",
+      "note": ""
+    },
+    {
+      "id": 12,
+      "split": "test",
+      "expect": "fire",
+      "prompt": "check whether AI crawlers can actually read our JavaScript-heavy site",
+      "note": ""
+    },
+    {
+      "id": 13,
+      "split": "test",
+      "expect": "fire",
+      "prompt": "track our mentions in ChatGPT and Claude month over month",
+      "note": ""
+    },
+    {
+      "id": 14,
+      "split": "test",
+      "expect": "fire",
+      "prompt": "What should we put on our pages so Google's AI Overviews quote us?",
+      "note": ""
+    },
+    {
+      "id": 15,
+      "split": "test",
+      "expect": "fire",
+      "prompt": "We added nosnippet years ago. Does that hurt us in AI answers?",
+      "note": ""
+    },
+    {
+      "id": 16,
+      "split": "test",
+      "expect": "fire",
+      "prompt": "build a set of buyer questions to test how visible we are in AI search",
+      "note": ""
+    },
+    {
+      "id": 17,
+      "split": "test",
+      "expect": "fire",
+      "prompt": "Why does Claude with web search never cite our docs?",
+      "note": ""
+    },
+    {
+      "id": 18,
+      "split": "test",
+      "expect": "fire",
+      "prompt": "How do I get onto the 'best of' lists that ChatGPT cites for our category?",
+      "note": ""
+    },
+    {
+      "id": 19,
+      "split": "test",
+      "expect": "fire",
+      "prompt": "audit our site for generative engine optimization",
+      "note": ""
+    },
+    {
+      "id": 20,
+      "split": "test",
+      "expect": "fire",
+      "prompt": "Is OAI-SearchBot allowed through our firewall and our robots rules?",
+      "note": ""
+    },
+    {
+      "id": 21,
+      "split": "dev",
+      "expect": "no-fire",
+      "prompt": "Fix the title tags and meta descriptions on my product pages",
+      "note": "on-page SEO"
+    },
+    {
+      "id": 22,
+      "split": "dev",
+      "expect": "no-fire",
+      "prompt": "Find broken links on my website",
+      "note": "broken links"
+    },
+    {
+      "id": 23,
+      "split": "dev",
+      "expect": "no-fire",
+      "prompt": "Cluster these 300 keywords into topics",
+      "note": "keyword clustering"
+    },
+    {
+      "id": 24,
+      "split": "dev",
+      "expect": "no-fire",
+      "prompt": "Write a content brief for an article about remote work tools",
+      "note": "content brief"
+    },
+    {
+      "id": 25,
+      "split": "dev",
+      "expect": "no-fire",
+      "prompt": "Translate my landing page into Spanish for the Mexican market",
+      "note": "translation"
+    },
+    {
+      "id": 26,
+      "split": "dev",
+      "expect": "no-fire",
+      "prompt": "Why is my site slow? Check Core Web Vitals and page speed.",
+      "note": "technical SEO"
+    },
+    {
+      "id": 27,
+      "split": "dev",
+      "expect": "no-fire",
+      "prompt": "Which internal links should I add between my blog posts?",
+      "note": "internal linking"
+    },
+    {
+      "id": 28,
+      "split": "dev",
+      "expect": "no-fire",
+      "prompt": "Plan a three-month content calendar for our blog",
+      "note": "content strategy"
+    },
+    {
+      "id": 29,
+      "split": "dev",
+      "expect": "no-fire",
+      "prompt": "Review this pull request for bugs",
+      "note": "code review"
+    },
+    {
+      "id": 30,
+      "split": "dev",
+      "expect": "no-fire",
+      "prompt": "Turn this spreadsheet into a pivot table",
+      "note": "none"
+    },
+    {
+      "id": 31,
+      "split": "test",
+      "expect": "no-fire",
+      "prompt": "Do an SEO health check of my site: crawl errors, sitemap, indexation",
+      "note": "classic SEO audit (our SKILL.md says to defer these)"
+    },
+    {
+      "id": 32,
+      "split": "test",
+      "expect": "no-fire",
+      "prompt": "Optimize this blog post for the keyword 'project management software'",
+      "note": "on-page SEO"
+    },
+    {
+      "id": 33,
+      "split": "test",
+      "expect": "no-fire",
+      "prompt": "Which pages on my site are orphans with no internal links?",
+      "note": "internal linking"
+    },
+    {
+      "id": 34,
+      "split": "test",
+      "expect": "no-fire",
+      "prompt": "Write a LinkedIn post announcing our product launch",
+      "note": "none"
+    },
+    {
+      "id": 35,
+      "split": "test",
+      "expect": "no-fire",
+      "prompt": "Check my hreflang tags on the Spanish version of the site",
+      "note": "translation / technical SEO"
+    },
+    {
+      "id": 36,
+      "split": "test",
+      "expect": "no-fire",
+      "prompt": "Draft an outline for an ebook about customer onboarding",
+      "note": "content brief / strategy"
+    },
+    {
+      "id": 37,
+      "split": "test",
+      "expect": "no-fire",
+      "prompt": "Find 404 errors and redirect chains on example.com",
+      "note": "broken links"
+    },
+    {
+      "id": 38,
+      "split": "test",
+      "expect": "no-fire",
+      "prompt": "Summarize this PDF for me",
+      "note": "pdf"
+    },
+    {
+      "id": 39,
+      "split": "test",
+      "expect": "no-fire",
+      "prompt": "Help me write a cold email sequence for outbound sales",
+      "note": "none"
+    },
+    {
+      "id": 40,
+      "split": "test",
+      "expect": "no-fire",
+      "prompt": "Convert this Word document to a clean markdown file",
+      "note": "none"
+    }
+  ]
+}

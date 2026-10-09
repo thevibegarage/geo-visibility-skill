@@ -24,7 +24,7 @@ A report that a crafted page, competitor site, review or forum thread can steer 
 
 ## Reporting a problem
 
-Use GitHub's private reporting if it is offered: the repository's **Security** tab, then **Report a vulnerability**. If you do not see that option, open an issue that says only "security contact requested" and contains no details; a maintainer will reply with a private channel. Please do not post details publicly first.
+Use GitHub's private reporting: open the repository's **Security** tab, then **Report a vulnerability**. Only the maintainers can see what you send. If you are reading a fork or mirror where that option is missing, open an issue that says only "security contact requested" and contains no details; a maintainer will reply with a private channel. Please do not post details publicly first.
 
 We aim to acknowledge a report within a week. Only the latest release is supported.
 
