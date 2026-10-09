@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Added
+- **Simulated activation test** (`tools/trigger_sim.py`, 40 prompts in `geo-visibility/evals/triggers.json` with a dev/test split fixed before any run). A stand-in model chooses between our skill, a third-party classic-SEO plugin's 11 skills and 3 unrelated ones, in two menu orders. Round 1 (the v0.2.0 description): our skill was chosen for 19 of 20 AI-search messages and 0 of 20 others. One `dev` miss (Googlebot vs Bingbot with a prerender service) led to one added phrase in the description; round 2: 20 of 20 and 0 of 20. The held-out half was already perfect, so no held-out improvement is claimed. Raw answers are saved and re-scored by a test.
 - **Claude Code plugin packaging.** `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` make the skill installable by name: `claude plugin marketplace add thevibegarage/geo-visibility-skill`, then `claude plugin install geo-visibility@geo-visibility`. The manifest points at the existing `geo-visibility/` folder, so nothing moved. Both files pass `claude plugin validate --strict`.
 - Tests for the packaging (`tests/test_plugin.py`): documented manifest rules, reserved-name checks, the plugin version staying in step with the latest released changelog entry, README install commands matching the manifest, and the official validator when the `claude` CLI is present (skipped in CI).
 - A release checklist in CONTRIBUTING.md.
@@ -10,7 +11,7 @@
 - **`geo-visibility.json` settings file** (domain, detail pages, IndexNow key, brand), read by both scripts and the commands; arguments override it; unknown keys are an error. New exit code 4 for a missing domain or unusable file. Example in `examples/geo-visibility.json`.
 - **SECURITY.md** stating what the scripts do and do not do, with tests that enforce it (no process, socket or dynamic-code modules, every request goes to the target or to URLs the site itself lists, no files written without `--json`, the tracker makes no requests).
 - A "Building on this" note in CONTRIBUTING.md.
-- Tests for the commands (format, safety wording, flags agree with the scripts' `--help`), the settings file and the security claims: 234 tests.
+- Tests for the commands (format, safety wording, flags agree with the scripts' `--help`), the settings file and the security claims: 234 tests. The activation tool adds 37 more (271 in total).
 - A clearly labelled "Need help implementing this?" note in the README: the maintainers' services offer, kept out of the skill entirely. Tests fail if any file in the skill folder, or anything the checker prints, names a company or promotes anything.
 
 ## v0.2.0 — 2026-10-08

@@ -19,9 +19,10 @@ Thanks for helping keep this skill sharp. The fastest-decaying parts are crawler
 ## How
 
 1. Fork, branch, edit.
-2. If you touch a script, template or reference map, run the suite: `python3 -m unittest discover -s tests` (standard library only; `pip install pyyaml` adds the workflow-syntax test). Add a regression test for every bug you fix, and prove it fails on the old code. Tests run against a local mock site, so they need no network.
-3. If you touch `SKILL.md`, keep it under ~500 lines and keep the reference map accurate.
-4. Note in your PR what you verified and on what date.
+2. If you change the skill's `description` in `geo-visibility/SKILL.md` (it decides when the skill loads), re-run the simulated activation test and record the result: `python3 tools/trigger_sim.py prepare --competitors <clone of a rival plugin> --out <dir>`, give each job file in `<dir>/jobs` to a fresh model, then `python3 tools/trigger_sim.py score --out <dir>`. Tune using the `dev` prompts only; `test` is the held-out half (see `geo-visibility/evals/results-triggers-2026-10-09.md`).
+3. If you touch a script, template or reference map, run the suite: `python3 -m unittest discover -s tests` (standard library only; `pip install pyyaml` adds the workflow-syntax test). Add a regression test for every bug you fix, and prove it fails on the old code. Tests run against a local mock site, so they need no network.
+4. If you touch `SKILL.md`, keep it under ~500 lines and keep the reference map accurate.
+5. Note in your PR what you verified and on what date.
 
 ## Building on this
 

@@ -118,6 +118,7 @@ class ReadmeAndExamples(unittest.TestCase):
     def test_no_real_company_is_the_subject_of_any_example_or_test(self):
         """Examples show a fictional site only. (The domain is built from parts so this file does not contain it.)"""
         domain = "garage" + "labstech"
+        rival = "search" + "fit"
         allowed = ("Built and open-sourced by", "Full audit on a real brand", "Copyright (c)", "\u00a9 2026",
                    "(https://www." + domain + ".com) can help")  # the labelled services note
         # the whole skill folder is included: nothing the skill reads, prints or generates may name a company
@@ -126,6 +127,14 @@ class ReadmeAndExamples(unittest.TestCase):
                 for n in names:
                     if n.endswith((".md", ".py", ".json", ".txt", ".csv")):
                         self.assertNotIn(domain, read(dirpath, n).lower(), os.path.join(dirpath, n))
+        # no other vendor is named in public text (the simulated activation test labels its rival plugin neutrally)
+        for folder in ("examples", "tools", "tests", "geo-visibility", ".claude-plugin", ".github", "skills"):
+            for dirpath, _, names in os.walk(os.path.join(ROOT, folder)):
+                for n in names:
+                    if n.endswith((".md", ".py", ".json", ".jsonl", ".txt", ".csv", ".yml")):
+                        self.assertNotIn(rival, read(dirpath, n).lower(), os.path.join(dirpath, n))
+        for name in ("README.md", "CHANGELOG.md", "CONTRIBUTING.md", "SECURITY.md"):
+            self.assertNotIn(rival, read(ROOT, name).lower(), name)
         for name in ("README.md", "CHANGELOG.md"):
             for line in read(ROOT, name).splitlines():
                 if domain in line.lower():
@@ -209,8 +218,19 @@ class Scripts(unittest.TestCase):
                         self.assertIn(n, stdlib, f"{os.path.basename(path)} imports non-stdlib {n}")
 
     def test_syntax_is_python_38_compatible(self):
-        for path in SCRIPTS:
+        tools = [os.path.join(ROOT, "tools", n) for n in os.listdir(os.path.join(ROOT, "tools")) if n.endswith(".py")]
+        for path in SCRIPTS + tools:
             ast.parse(read(path), feature_version=(3, 8))
+
+    def test_no_dict_union_operator_which_needs_python_39(self):
+        """CI runs 3.8; 'a | b' on dicts parses fine there and only fails at run time, so look for the pattern directly."""
+        files = SCRIPTS + [os.path.join(ROOT, "tools", n) for n in os.listdir(os.path.join(ROOT, "tools")) if n.endswith(".py")]
+        for path in files:
+            tree = ast.parse(read(path))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
+                    self.assertFalse(isinstance(node.left, (ast.Dict, ast.DictComp)) or isinstance(node.right, (ast.Dict, ast.DictComp)),
+                                     f"{os.path.basename(path)} line {node.lineno} merges dicts with |")
 
     def test_help_runs(self):
         for path in SCRIPTS:

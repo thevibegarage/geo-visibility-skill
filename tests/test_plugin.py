@@ -69,7 +69,7 @@ class PluginManifest(unittest.TestCase):
     def test_the_reserved_name_check_catches_what_the_docs_list(self):
         for bad in ("claude-evil", "anthropic-tools", "cc-plugin-x", "claude", "official-claude-tools", "Claude_Code"):
             self.assertTrue(reserved_plugin_name(bad), bad)
-        for good in ("geo-visibility", "searchfit-seo", "deploy-tools"):
+        for good in ("geo-visibility", "seo-toolkit", "deploy-tools"):
             self.assertFalse(reserved_plugin_name(good), good)
 
     def test_only_documented_top_level_fields_are_used(self):
