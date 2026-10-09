@@ -121,6 +121,7 @@ RENDER_AGENTS = {
     "search crawler (Bingbot)": AGENTS["search_and_user_fetch"]["Bingbot"],
 }
 TIMEOUT = 15
+HREFLANG_FETCH_LIMIT = 10  # alternate pages fetched per run to verify return links
 SHELL_WORDS = 150  # below this a page is "thin"; see render_by_agent for how short real pages are handled
 SITEMAP_MAX = 50_000_000  # sitemaps may be 50 MB uncompressed
 SITEMAP_SAMPLE = 5  # child sitemaps fetched from a sitemap index
@@ -168,6 +169,39 @@ def fetch(url, ua=BROWSER_UA, max_bytes=2_000_000):
         return e.code, _headers(e.headers), "", url
     except Exception as e:  # network, DNS, TLS
         return 0, {}, f"ERROR: {e}", url
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args, **kwargs):
+        return None
+
+
+_NO_FOLLOW = urllib.request.build_opener(_NoRedirect)
+
+
+def probe(url, ua=BROWSER_UA):
+    """One GET that does not follow redirects. Returns (status, Location header, error); status 0 means a network error."""
+    req = urllib.request.Request(url, headers={"User-Agent": ua, "Accept": "*/*"})
+    try:
+        with _NO_FOLLOW.open(req, timeout=TIMEOUT) as r:
+            return r.status, r.headers.get("Location", ""), ""
+    except urllib.error.HTTPError as e:
+        return e.code, (e.headers.get("Location", "") if e.headers else ""), ""
+    except Exception as e:
+        return 0, "", str(e)
+
+
+def _http_variant(base):
+    """The plain-HTTP root of an HTTPS site on the default port, or None (an http target, or a custom port, has no such twin)."""
+    parsed = urlparse(base)
+    return f"http://{parsed.netloc}/" if parsed.scheme == "https" and ":" not in parsed.netloc else None
+
+
+def _twin_root(base):
+    """(twin host, its root URL) for the www/apex counterpart of the audited host, or (None, None)."""
+    parsed = urlparse(base)
+    twin = seo_checks.twin_host(parsed.netloc)
+    return (twin, f"{parsed.scheme}://{twin}/") if twin else (None, None)
 
 
 # ---------------------------------------------------------------------------------------------
@@ -806,6 +840,50 @@ def check(domain, paths, indexnow_key=None):
             add(area, name if pth == "/" else f"{name}: {pth}", status, detail, fix, group=f"seo:{name}", base=name, page=pth)
     for area, name, status, detail, fix in seo_checks.duplicates(seo_pages):
         add(area, name, status, detail, fix, group=f"seo:{name}", base=name)
+
+    # --- hreflang return links: every alternate must name the page back. Only same-host alternates are fetched.
+    audited_host = urlparse(base).netloc.lower()
+    sources = [(urljoin(base + "/", pth.lstrip("/")), f) for pth, f in seo_pages.items() if f["hreflangs"]]
+    if sources:
+        fetched, other_hosts, unverified, problems = {}, set(), [], []
+        for src, facts in sources:
+            for _, href in facts["hreflangs"]:
+                alt = urljoin(src, href.strip())
+                parts = urlparse(alt)
+                if parts.scheme not in ("http", "https") or seo_checks.same_url(alt, src):
+                    continue
+                if parts.netloc.lower() != audited_host:
+                    other_hosts.add(parts.netloc.lower())
+                    continue
+                if alt not in fetched and len(fetched) < HREFLANG_FETCH_LIMIT:
+                    c, _, body, _ = fetch(alt, ua=googlebot)
+                    shell = 200 <= c < 300 and count_words(" ".join(parse_page(body).text)) < 50
+                    fetched[alt] = (c, None if shell else seo_checks.analyze(body)["hreflangs"] if 200 <= c < 300 else [])
+                if alt in fetched:
+                    c, alt_tags = fetched[alt]
+                    if alt_tags is None:
+                        unverified.append(parts.path or "/")
+                        continue
+                    problem = seo_checks.return_link_problem(src, alt, c, alt_tags)
+                    if problem:
+                        problems.append(problem)
+        checked = len([1 for c, tags in fetched.values() if tags is not None])
+        st, detail, fix = seo_checks.reciprocity_row(sorted(set(problems)), checked, sorted(set(unverified)), other_hosts)
+        if len(fetched) >= HREFLANG_FETCH_LIMIT:
+            detail += f" (stopped after {HREFLANG_FETCH_LIMIT} alternate fetches)"
+        add("indexing", "hreflang return links", st, detail, fix, group="seo:hreflang return links")
+
+    # --- URL hygiene: one secure version, one host. The probes go to the audited host and its www/apex twin only.
+    http_root = _http_variant(base)
+    if http_root:
+        status, loc, err = probe(http_root)
+        st, detail, fix = seo_checks.protocol_row(status, loc, err, audited_host)
+        add("indexing", "HTTP to HTTPS redirect", st, detail, fix, group="seo:HTTP to HTTPS redirect")
+    twin, twin_root = _twin_root(base)
+    if twin:
+        status, loc, err = probe(twin_root)
+        st, detail, fix = seo_checks.host_row(status, loc, err, audited_host, twin)
+        add("indexing", "www and apex host", st, detail, fix, group="seo:www and apex host")
 
     # --- search-engine webmaster hints (Bing feeds Copilot and, reportedly, ChatGPT search and DuckDuckGo) ---
     c, _, bx, _ = fetch(base + "/BingSiteAuth.xml")

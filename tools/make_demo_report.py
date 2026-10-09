@@ -86,12 +86,13 @@ The checker fetches every `--paths` page as a browser, as GPTBot, as two user-fe
 | `robots.txt` disallows `Claude-SearchBot` | Must fix #1. (`GPTBot` is disallowed too, but a training opt-out is a choice, so it appears under Other notes as `info`.) |
 | A bot rule refuses `PerplexityBot` with HTTP 403 | Must fix #2 |
 | `/pricing` is an empty JavaScript app shell for every agent | Must fix #3, and 0 words in every column above |
-| The homepage has no JSON-LD | Must fix #4 and #8 |
+| The homepage has no JSON-LD | Must fix #4 and #9 |
 | `/blog/crm-for-agencies` is a full page for Googlebot but a shell for Bingbot | Must fix #5, and the 0 in the Bingbot column |
-| The homepage, `/features` and the blog post share one meta description | Must fix #10, which names all three pages |
-| The blog post has an image with no alt text | Must fix #9 |
+| The homepage, `/features` and the blog post share one meta description | Must fix #11, which names all three pages |
+| The blog post has an image with no alt text | Must fix #10 |
 | The homepage sets `nosnippet`, as an SEO plugin might | Must fix #6 |
-| Every sitemap entry has the same `lastmod` | Must fix #7 |
+| Every sitemap entry has the same `lastmod` | Must fix #8 |
+| The homepage lists a German version at `/de`, and `/de` does not link back (hreflang) | Must fix #7, found by fetching the alternate |
 | `/features` is a shell for a default fetch but full HTML for crawlers | Not a problem: the checker credits it as dynamic rendering by user agent (the pass row hidden by `--issues-only`; note the Default fetch column) |
 | No Bing Webmaster Tools tag, no `llms.txt` | Worth checking |
 """

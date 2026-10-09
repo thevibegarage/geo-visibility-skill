@@ -16,6 +16,7 @@ Flaws planted on purpose (the checker should report every one):
   * the homepage sets "nosnippet" (as an SEO plugin might) and carries no JSON-LD
   * every sitemap entry has the same lastmod date
   * the homepage, /features and the blog post share one meta description, and the blog post has an image with no alt text
+  * the homepage declares a German version at /de (hreflang) that does not link back, so the pair is not reciprocal
   * no Bing Webmaster Tools verification tag and no llms.txt
 Standard library only.
 """
@@ -77,8 +78,13 @@ def respond(path, ua, host):
         return 200, "application/xml", ("<?xml version='1.0' encoding='UTF-8'?>"
                                         f"<urlset xmlns='http://www.sitemaps.org/schemas/sitemap/0.9'>{entries}</urlset>")
     if path == "/":
+        alternates = "".join(f'<link rel="alternate" hreflang="{c}" href="http://{host}{p}">'
+                             for c, p in (("en", "/"), ("de", "/de"), ("x-default", "/")))
         return 200, "text/html", page(host, path, "Meridian CRM: the CRM for mid-size agencies", "Meridian CRM", 400,
-                                      head='<meta name="robots" content="nosnippet">')
+                                      head='<meta name="robots" content="nosnippet">' + alternates)
+    if path == "/de":  # names itself but not the English page: the return link is missing
+        return 200, "text/html", page(host, path, "Meridian CRM auf Deutsch", "Meridian CRM auf Deutsch", 300,
+                                      head=f'<link rel="alternate" hreflang="de" href="http://{host}/de">')
     if path == "/pricing":
         return 200, "text/html", SHELL
     if path == "/features":

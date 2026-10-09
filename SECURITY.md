@@ -4,13 +4,13 @@ This project is a Claude skill, two standard-library Python scripts and some mar
 
 ## What the scripts do
 
-- **`check_ai_readiness.py`** sends HTTP GET requests to the site you point it at, using realistic crawler user-agent strings (Googlebot, Bingbot, GPTBot and others) to see what each agent would receive. It also follows the sitemap and robots.txt URLs that the site itself lists, which can be on another host. It contacts nothing else.
+- **`check_ai_readiness.py`** sends HTTP GET requests to the site you point it at, using realistic crawler user-agent strings (Googlebot, Bingbot, GPTBot and others) to see what each agent would receive. It also follows the sitemap and robots.txt URLs that the site itself lists, which can be on another host. To check URL hygiene it makes one request to the plain-HTTP version of the site and one to the site's own `www`/apex twin (`example.com` and `www.example.com`), without following redirects. Both hosts are derived from the address you gave, never from page content, and `hreflang` alternates on other hosts are named in the report but never fetched. It contacts nothing else.
 - **`score_tracker.py`** reads a CSV file you give it and prints a report. It makes no network requests.
 - **No telemetry, no accounts, no API keys.** Nothing is sent anywhere except the requests above.
 - **Files:** the checker writes a file only when you pass `--json`. Neither script modifies your site or your code.
 - **Dependencies:** none. Both scripts import only the Python standard library and `geo_config.py`, a sibling file that reads `geo-visibility.json`.
 
-Tests that enforce these statements: no network, process, or dynamic-code modules are imported (`subprocess`, `socket`, `ctypes` and similar); no `eval` or `exec`; every request in a run goes to the target host; a run without `--json` leaves the working directory unchanged; the tracker makes no requests.
+Tests that enforce these statements: no network, process, or dynamic-code modules are imported (`subprocess`, `socket`, `ctypes` and similar); no `eval` or `exec`; every request in a run goes to the target host, its `www`/apex twin, or a sitemap host the site itself lists; a run without `--json` leaves the working directory unchanged; the tracker makes no requests.
 
 ## Responsible use
 
