@@ -6,6 +6,11 @@
 - **Claude Code plugin packaging.** `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` make the skill installable by name: `claude plugin marketplace add thevibegarage/geo-visibility-skill`, then `claude plugin install geo-visibility@geo-visibility`. The manifest points at the existing `geo-visibility/` folder, so nothing moved. Both files pass `claude plugin validate --strict`.
 - Tests for the packaging (`tests/test_plugin.py`): documented manifest rules, reserved-name checks, the plugin version staying in step with the latest released changelog entry, README install commands matching the manifest, and the official validator when the `claude` CLI is present (skipped in CI).
 - A release checklist in CONTRIBUTING.md.
+- **Four slash commands** as slash-only skills (they cannot compete with the main skill): `/geo-visibility:audit`, `check`, `track` and `diagnose`. Arguments are treated as data and values with shell characters are refused. Checked end to end in throwaway Claude Code sessions, including hostile arguments (nothing ran, no file was created).
+- **`geo-visibility.json` settings file** (domain, detail pages, IndexNow key, brand), read by both scripts and the commands; arguments override it; unknown keys are an error. New exit code 4 for a missing domain or unusable file. Example in `examples/geo-visibility.json`.
+- **SECURITY.md** stating what the scripts do and do not do, with tests that enforce it (no process, socket or dynamic-code modules, every request goes to the target or to URLs the site itself lists, no files written without `--json`, the tracker makes no requests).
+- A "Building on this" note in CONTRIBUTING.md.
+- Tests for the commands (format, safety wording, flags agree with the scripts' `--help`), the settings file and the security claims: 234 tests.
 - A clearly labelled "Need help implementing this?" note in the README: the maintainers' services offer, kept out of the skill entirely. Tests fail if any file in the skill folder, or anything the checker prints, names a company or promotes anything.
 
 ## v0.2.0 — 2026-10-08

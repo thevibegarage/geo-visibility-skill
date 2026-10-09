@@ -23,6 +23,10 @@ Thanks for helping keep this skill sharp. The fastest-decaying parts are crawler
 3. If you touch `SKILL.md`, keep it under ~500 lines and keep the reference map accurate.
 4. Note in your PR what you verified and on what date.
 
+## Building on this
+
+You do not need permission to build on this project. MIT lets you use, modify and redistribute it, including inside a commercial product or service, as long as you keep the copyright and license notice. Attribution is appreciated, and telling us what you built is welcome but never required. If you change the behavior, please do not present our test results or verification dates as yours: they describe this repository's code, not a fork's.
+
 ## Releasing
 
 A release moves four things together, and tests fail if they drift:
