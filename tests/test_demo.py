@@ -74,6 +74,7 @@ class CheckerOnTheDemoSite(unittest.TestCase):
             ("fail", "JSON-LD present"),
             ("warn", "render by agent: /blog/crm-for-agencies"),
             ("warn", "snippet and archive controls"),
+            ("warn", "hreflang return links"),
             ("warn", "sitemap lastmod honesty"),
             ("warn", "Organization schema"),
             ("warn", "image alt text"),
@@ -103,7 +104,7 @@ class CheckerOnTheDemoSite(unittest.TestCase):
             self.assertIn(expected, names)
 
     def test_score_line(self):
-        self.assertEqual((self.res["scores"]["fail_count"], self.res["scores"]["warn_count"]), (4, 6))
+        self.assertEqual((self.res["scores"]["fail_count"], self.res["scores"]["warn_count"]), (4, 7))
 
 
 class GeneratedReport(unittest.TestCase):

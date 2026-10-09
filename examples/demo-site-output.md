@@ -13,9 +13,9 @@
 
 # AI readiness: http://127.0.0.1:8765
 
-Technical readiness: **75%** (4 failures, 6 warnings)
+Technical readiness: **75%** (4 failures, 7 warnings)
 
-## Must fix (10)
+## Must fix (11)
 
 | # | Severity | Area | Issue | Detail | Fix |
 |---|---|---|---|---|---|
@@ -25,10 +25,11 @@ Technical readiness: **75%** (4 failures, 6 warnings)
 | 4 | fail | schema | JSON-LD present | none | Add Organization/WebSite JSON-LD (assets/schema-templates.md). |
 | 5 | warn | render | render by agent: /blog/crm-for-agencies | Googlebot and Bingbot receive different HTML (643 vs 0 words) | Add Bingbot to any crawler allowlist or prerender rule so Bing, and the AI assistants that use its index, see the same page. |
 | 6 | warn | indexing | snippet and archive controls | meta robots: nosnippet/max-snippet:0 (Google: also excluded from AI Overviews and AI Mode as direct input; Bing: respected for generative captions) | If this is not a deliberate opt-out, remove it: these directives limit how AI answers can quote or link the page. |
-| 7 | warn | discovery | sitemap lastmod honesty | 0/13 stamped today; 13/13 share 2026-03-02. Looks generated or bulk-updated rather than real edit dates. | Emit each page's real updated date, or omit lastmod. |
-| 8 | warn | schema | Organization schema | missing on homepage | Add Organization JSON-LD with name, url, logo and sameAs (assets/schema-templates.md). |
-| 9 | warn | onpage | image alt text | /blog/crm-for-agencies: 1 of 1 images have no alt attribute (for example /team.png) | Describe each image in alt text, or use alt="" for purely decorative images. |
-| 10 | warn | onpage | duplicate descriptions | /, /features, /blog/crm-for-agencies share "meridian crm is a crm for mid-size agencies that want one pi" | Write a distinct description for each page. |
+| 7 | warn | indexing | hreflang return links | /de does not link back to / | Every language version must link back to the page that links to it, or search engines may ignore the set. Add the missing return annotation to the alternate page. |
+| 8 | warn | discovery | sitemap lastmod honesty | 0/13 stamped today; 13/13 share 2026-03-02. Looks generated or bulk-updated rather than real edit dates. | Emit each page's real updated date, or omit lastmod. |
+| 9 | warn | schema | Organization schema | missing on homepage | Add Organization JSON-LD with name, url, logo and sameAs (assets/schema-templates.md). |
+| 10 | warn | onpage | image alt text | /blog/crm-for-agencies: 1 of 1 images have no alt attribute (for example /team.png) | Describe each image in alt text, or use alt="" for purely decorative images. |
+| 11 | warn | onpage | duplicate descriptions | /, /features, /blog/crm-for-agencies share "meridian crm is a crm for mid-size agencies that want one pi" | Write a distinct description for each page. |
 
 ## Worth checking (not scored)
 
@@ -38,7 +39,7 @@ Technical readiness: **75%** (4 failures, 6 warnings)
 - **Google Search Console verification**: no google-site-verification meta tag found (a DNS record or file also verifies a site) — Verify the site in Google Search Console and submit the sitemap.
 - **IndexNow key file**: not checked (pass --indexnow-key KEY to verify /KEY.txt) — Enable IndexNow (Bing and other engines) and re-run with --indexnow-key to verify the key file.
 
-## Other notes (84 checks hidden: passing, routine, or listed above)
+## Other notes (86 checks hidden: passing, routine, or listed above)
 
 | Area | Check | Status | Detail | Fix |
 |---|---|---|---|---|
@@ -65,11 +66,12 @@ The checker fetches every `--paths` page as a browser, as GPTBot, as two user-fe
 | `robots.txt` disallows `Claude-SearchBot` | Must fix #1. (`GPTBot` is disallowed too, but a training opt-out is a choice, so it appears under Other notes as `info`.) |
 | A bot rule refuses `PerplexityBot` with HTTP 403 | Must fix #2 |
 | `/pricing` is an empty JavaScript app shell for every agent | Must fix #3, and 0 words in every column above |
-| The homepage has no JSON-LD | Must fix #4 and #8 |
+| The homepage has no JSON-LD | Must fix #4 and #9 |
 | `/blog/crm-for-agencies` is a full page for Googlebot but a shell for Bingbot | Must fix #5, and the 0 in the Bingbot column |
-| The homepage, `/features` and the blog post share one meta description | Must fix #10, which names all three pages |
-| The blog post has an image with no alt text | Must fix #9 |
+| The homepage, `/features` and the blog post share one meta description | Must fix #11, which names all three pages |
+| The blog post has an image with no alt text | Must fix #10 |
 | The homepage sets `nosnippet`, as an SEO plugin might | Must fix #6 |
-| Every sitemap entry has the same `lastmod` | Must fix #7 |
+| Every sitemap entry has the same `lastmod` | Must fix #8 |
+| The homepage lists a German version at `/de`, and `/de` does not link back (hreflang) | Must fix #7, found by fetching the alternate |
 | `/features` is a shell for a default fetch but full HTML for crawlers | Not a problem: the checker credits it as dynamic rendering by user agent (the pass row hidden by `--issues-only`; note the Default fetch column) |
 | No Bing Webmaster Tools tag, no `llms.txt` | Worth checking |

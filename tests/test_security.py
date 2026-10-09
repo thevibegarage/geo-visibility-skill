@@ -66,11 +66,19 @@ class Runtime(unittest.TestCase):
             hosts.append(req.full_url.split("/")[2] if hasattr(req, "full_url") else str(req))
             return real(req, *a, **kw)
 
+        real_probe = ck._NO_FOLLOW.open  # the redirect-free probe uses its own opener, so it is recorded too
+
+        def probe_spy(req, *a, **kw):
+            hosts.append(req.full_url.split("/")[2])
+            return real_probe(req, *a, **kw)
+
         ck.urllib.request.urlopen = spy
+        ck._NO_FOLLOW.open = probe_spy
         try:
             fn()
         finally:
             ck.urllib.request.urlopen = real
+            ck._NO_FOLLOW.open = real_probe
         return hosts
 
     def test_every_request_in_a_run_goes_to_the_target_host(self):
