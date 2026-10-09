@@ -204,7 +204,8 @@ tools/trigger_sim.py          # simulated activation test (does a model pick thi
 
 ## Roadmap
 
-- **v0.3** — re-run evals 1-5 and add more; trigger-reliability testing; outcome data from real monthly re-tests; run the checker on WordPress, Next.js and Shopify stacks; confirm or retire the Brave hypothesis; optional API runners for prompt sets (OpenAI web search, Perplexity Sonar, Gemini grounding)
+- **v0.4** — a bounded crawl (broken links, redirect chains, orphan pages, click depth); a `--repo` scan of your code for rules that name Googlebot but not Bingbot; a computed "fix these and reach X%" score; a shareable HTML report with a computed grade; Bing AI Performance CSV import
+- **Carried over** — re-run evals 1-5 and add more; outcome data from real monthly re-tests; run the checker on WordPress, Next.js and Shopify stacks; confirm or retire the Brave hypothesis; optional API runners for prompt sets (OpenAI web search, Perplexity Sonar, Gemini grounding)
 - **Later** — multi-language prompt-audit templates (starting with Hindi/Hinglish); more vertical playbooks from community PRs
 - **Ongoing** — crawler and engine-behavior updates as vendors change (open an [engine-update issue](.github/ISSUE_TEMPLATE/engine-update.md) when you spot one)
 

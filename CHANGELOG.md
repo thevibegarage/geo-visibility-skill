@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## v0.3.0 — 2026-10-09
+
+The checker now covers classic SEO (on-page tags, hreflang, URL hygiene) next to AI-crawler readiness, and the skill installs as a Claude Code plugin with four slash commands.
 
 ### Added
 - **Simulated activation test** (`tools/trigger_sim.py`, 40 prompts in `geo-visibility/evals/triggers.json` with a dev/test split fixed before any run). A stand-in model chooses between our skill, a third-party classic-SEO plugin's 11 skills and 3 unrelated ones, in two menu orders. Round 1 (the v0.2.0 description): our skill was chosen for 19 of 20 AI-search messages and 0 of 20 others. One `dev` miss (Googlebot vs Bingbot with a prerender service) led to one added phrase in the description; round 2: 20 of 20 and 0 of 20. The held-out half was already perfect, so no held-out improvement is claimed. Raw answers are saved and re-scored by a test.
