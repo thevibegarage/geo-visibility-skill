@@ -41,6 +41,7 @@ import json
 import os
 import re
 import sys
+import time
 import urllib.error
 import urllib.request
 import zlib
@@ -49,6 +50,7 @@ from urllib.parse import urljoin, urlparse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # sibling module, however the script is loaded
 import geo_config  # noqa: E402
+import seo_checks  # noqa: E402
 
 
 def _bot_ua(name, version="1.0", url=None):
@@ -559,6 +561,14 @@ def _short(detail, limit=220):
     return detail if len(detail) <= limit else detail[: limit - 3].rstrip() + "..."
 
 
+def _page_detail(items):
+    """One line for the same issue on several pages: the pages named once if the detail is identical, else page by page."""
+    if len({d for _, d in items}) == 1:
+        return _short(f"{', '.join(pg for pg, _ in items)}: {items[0][1]}")
+    shown = "; ".join(f"{pg}: {d}" for pg, d in items[:3]) + (f"; and {len(items) - 3} more pages" if len(items) > 3 else "")
+    return _short(shown, 320)
+
+
 def must_fix(findings):
     """Failures first, then warnings; within each, by area (access, render, indexing, ...). Info and pass rows are excluded.
 
@@ -579,6 +589,16 @@ def must_fix(findings):
                 for g in findings):
             continue
         key = (f["group"], f["status"])
+        if f.get("page") and f.get("base") and f["group"] not in GROUP_LABELS:
+            pkey = ("page", f["base"], f["status"], f["fix"])  # the same issue on several pages is one entry that names them
+            if pkey in merged:
+                merged[pkey]["items"].append((f["page"], f["detail"]))
+                continue
+            entry = {"status": f["status"], "area": f["area"], "check": f["base"], "agents": [], "items": [(f["page"], f["detail"])],
+                     "detail": "", "fix": f["fix"] or NO_FIX}
+            merged[pkey] = entry
+            out.append(entry)
+            continue
         if f["group"] in GROUP_LABELS:
             label, who = GROUP_LABELS[f["group"]]
             if key in merged:
@@ -594,14 +614,33 @@ def must_fix(findings):
     for e in out:
         if e["agents"]:
             e["detail"] = ", ".join(e["agents"]) + f": {e['detail']}"
+        items = e.pop("items", None)
+        if items:
+            e["detail"] = _page_detail(items)
     out.sort(key=lambda e: (0 if e["status"] == "fail" else 1, AREA_ORDER.get(e["area"], 9)))  # stable: keeps check order
     return out
 
 
 def worth_checking(findings):
-    """Unscored (info) rows that carry a suggested action: not defects, but open points."""
-    return [{"check": f["check"], "detail": _short(f["detail"]), "fix": f["fix"]}
-            for f in findings if f["status"] == "info" and f["fix"]]
+    """Unscored (info) rows that carry a suggested action: not defects, but open points. The same advice on several pages is one line."""
+    out, merged = [], {}
+    for f in findings:
+        if f["status"] != "info" or not f["fix"]:
+            continue
+        if f.get("page") and f.get("base"):
+            key = (f["base"], f["fix"])
+            if key in merged:
+                merged[key]["items"].append((f["page"], f["detail"]))
+                continue
+            merged[key] = {"check": f["base"], "items": [(f["page"], f["detail"])], "fix": f["fix"]}
+            out.append(merged[key])
+        else:
+            out.append({"check": f["check"], "detail": _short(f["detail"]), "fix": f["fix"]})
+    for e in out:
+        items = e.pop("items", None)
+        if items:
+            e["detail"] = _page_detail(items)
+    return out
 
 
 def _tokens(value):
@@ -615,9 +654,10 @@ def check(domain, paths, indexnow_key=None):
     base = f"{parsed.scheme}://{parsed.netloc}"
     res = {"domain": base, "findings": [], "scores": {}, "unreachable": False}
 
-    def add(area, check_name, status, detail, fix="", group=None):
+    def add(area, check_name, status, detail, fix="", group=None, base=None, page=None):
         res["findings"].append(
-            {"area": area, "check": check_name, "status": status, "detail": detail, "fix": fix, "group": group}
+            {"area": area, "check": check_name, "status": status, "detail": detail, "fix": fix, "group": group,
+             "base": base, "page": page}
         )
 
     # --- reachability gate: never report fake findings when the fetch itself failed or was refused ---
@@ -734,15 +774,6 @@ def check(domain, paths, indexnow_key=None):
         "; ".join(limits) if limits else "no nosnippet, max-snippet:0, noarchive or nocache on the homepage",
         "If this is not a deliberate opt-out, remove it: these directives limit how AI answers can quote or link the page."
         if limits else "")
-    add("indexing", "canonical", "pass" if p.canonical else "warn", p.canonical or "missing", "Add a canonical tag." if not p.canonical else "")
-    title_ok = 10 <= len(p.title.strip()) <= 70
-    add("onpage", "title", "pass" if title_ok else "warn", p.title.strip()[:90] or "missing",
-        "" if title_ok else "Use a title of 10-70 characters that says what the page is and who it is for.")
-    desc = p.meta.get("description", "")
-    add("onpage", "meta description", "pass" if desc else "warn", desc[:120] or "missing",
-        "" if desc else "Add a meta description: one or two sentences that state the offer.")
-    add("onpage", "single h1", "pass" if p.h1 == 1 else "warn", f"{p.h1} h1, {p.h2} h2",
-        "" if p.h1 == 1 else "Use exactly one H1 that matches the page topic.")
     types, errs = jsonld_types(p.jsonld)
     add("schema", "JSON-LD present", "pass" if types else "fail", ", ".join(types) or "none",
         "Add Organization/WebSite JSON-LD (assets/schema-templates.md)." if not types else "")
@@ -751,6 +782,30 @@ def check(domain, paths, indexnow_key=None):
     org = [t for t in types if is_organization_type(t)]
     add("schema", "Organization schema", "pass" if org else "warn", ", ".join(org) if org else "missing on homepage",
         "" if org else "Add Organization JSON-LD with name, url, logo and sameAs (assets/schema-templates.md).")
+
+    # --- on-page SEO for the homepage and each --paths page, from what Googlebot receives (one request per page) ---
+    googlebot = AGENTS["search_and_user_fetch"]["Googlebot"]
+    seo_pages = {}
+    for pth in dict.fromkeys(["/"] + list(paths)):
+        u = urljoin(base + "/", pth.lstrip("/"))
+        started = time.monotonic()
+        c, _, body, _ = fetch(u, ua=googlebot)
+        ms = round((time.monotonic() - started) * 1000)
+        if not 200 <= c < 300:
+            add("onpage", f"on-page checks: {pth}", "info", f"not assessed: HTTP {c} for Googlebot" if c else "not assessed: request error",
+                "", page=pth, base="on-page checks")
+            continue
+        if count_words(" ".join(parse_page(body).text)) < 50:
+            add("onpage", f"on-page checks: {pth}", "info",
+                "not assessed: the HTML Googlebot receives is a JavaScript shell (see the render checks)", "",
+                page=pth, base="on-page checks")
+            continue
+        facts = seo_checks.analyze(body)
+        seo_pages[pth] = facts
+        for area, name, status, detail, fix in seo_checks.page_findings(facts, u, ms):
+            add(area, name if pth == "/" else f"{name}: {pth}", status, detail, fix, group=f"seo:{name}", base=name, page=pth)
+    for area, name, status, detail, fix in seo_checks.duplicates(seo_pages):
+        add(area, name, status, detail, fix, group=f"seo:{name}", base=name)
 
     # --- search-engine webmaster hints (Bing feeds Copilot and, reportedly, ChatGPT search and DuckDuckGo) ---
     c, _, bx, _ = fetch(base + "/BingSiteAuth.xml")

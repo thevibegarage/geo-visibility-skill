@@ -88,6 +88,8 @@ The checker fetches every `--paths` page as a browser, as GPTBot, as two user-fe
 | `/pricing` is an empty JavaScript app shell for every agent | Must fix #3, and 0 words in every column above |
 | The homepage has no JSON-LD | Must fix #4 and #8 |
 | `/blog/crm-for-agencies` is a full page for Googlebot but a shell for Bingbot | Must fix #5, and the 0 in the Bingbot column |
+| The homepage, `/features` and the blog post share one meta description | Must fix #10, which names all three pages |
+| The blog post has an image with no alt text | Must fix #9 |
 | The homepage sets `nosnippet`, as an SEO plugin might | Must fix #6 |
 | Every sitemap entry has the same `lastmod` | Must fix #7 |
 | `/features` is a shell for a default fetch but full HTML for crawlers | Not a problem: the checker credits it as dynamic rendering by user agent (the pass row hidden by `--issues-only`; note the Default fetch column) |

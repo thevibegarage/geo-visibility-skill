@@ -15,6 +15,7 @@ Flaws planted on purpose (the checker should report every one):
   * /blog/crm-for-agencies is full for Googlebot and everyone else but a shell for Bingbot
   * the homepage sets "nosnippet" (as an SEO plugin might) and carries no JSON-LD
   * every sitemap entry has the same lastmod date
+  * the homepage, /features and the blog post share one meta description, and the blog post has an image with no alt text
   * no Bing Webmaster Tools verification tag and no llms.txt
 Standard library only.
 """
@@ -49,12 +50,13 @@ def words(n):
     return " ".join(out[:n])
 
 
-def page(host, path, title, h1, n_words, head=""):
+def page(host, path, title, h1, n_words, head="", extra=""):
     return ('<!doctype html><html lang="en"><head><meta charset="utf-8">'
             f"<title>{title}</title>"
-            '<meta name="description" content="Meridian CRM is a CRM for mid-size agencies.">'
+            '<meta name="description" content="Meridian CRM is a CRM for mid-size agencies that want one pipeline, one inbox and one source of truth.">'
+            '<meta name="viewport" content="width=device-width, initial-scale=1">'
             f'<link rel="canonical" href="http://{host}{path}">{head}</head>'
-            f"<body><h1>{h1}</h1><p>{words(n_words)}</p></body></html>")
+            f"<body><h1>{h1}</h1><p>{words(n_words)}</p>{extra}</body></html>")
 
 
 def respond(path, ua, host):
@@ -86,7 +88,8 @@ def respond(path, ua, host):
     if path in BLOG_URLS:
         if "bingbot" in low:
             return 200, "text/html", SHELL
-        return 200, "text/html", page(host, path, "CRM for agencies: what to look for", "CRM for agencies", 640)
+        return 200, "text/html", page(host, path, "CRM for agencies: what to look for", "CRM for agencies", 640,
+                                      extra='<img src="/team.png" width="600" height="400">')
     return 404, "text/plain", "Not found"
 
 

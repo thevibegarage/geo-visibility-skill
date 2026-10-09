@@ -340,7 +340,7 @@ class Scoring(unittest.TestCase):
 
     def test_unit_cost_is_a_meaningful_share(self):
         res = self.score("User-agent: OAI-SearchBot\nDisallow: /\n")
-        self.assertLessEqual(res["scores"]["technical_readiness_pct"], 95)
+        self.assertLessEqual(res["scores"]["technical_readiness_pct"], 98)  # one unit among ~45 scored checks
 
 
 # ---------------------------------------------------------------------------------------------

@@ -36,11 +36,15 @@ def lorem(n):
     return " ".join(f"word{i % 50}" for i in range(n))
 
 
-def html_page(title="Acme Widgets: invoice reconciliation", words=400, h1="Acme Widgets", head="", body_extra="", jsonld=True):
+def html_page(title="Acme Widgets: invoice reconciliation", words=400, h1="Acme Widgets", head="", body_extra="", jsonld=True, path="/"):
     ld = ('<script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Acme"}</script>'
           if jsonld else "")
-    return (f"<!doctype html><html><head><title>{title}</title><meta name='description' content='Acme makes widgets.'>"
-            f"<link rel='canonical' href='https://acme.example/'>{head}{ld}</head>"
+    # {BASE} is replaced by the test server with its own address, so the canonical URL matches the host being audited
+    return (f"<!doctype html><html lang='en'><head><meta charset='utf-8'><title>{title}</title>"
+            f"<meta name='description' content='{title}. Acme makes invoice reconciliation software for chartered accountants in India.'>"
+            f"<meta name='viewport' content='width=device-width, initial-scale=1'>"
+            f"<meta property='og:title' content='Acme'><meta property='og:description' content='Acme'><meta property='og:image' content='{{BASE}}/og.png'>"
+            f"<link rel='canonical' href='{{BASE}}{path}'>{head}{ld}</head>"
             f"<body><h1>{h1}</h1><p>{lorem(words)}</p>{body_extra}</body></html>")
 
 
@@ -79,7 +83,7 @@ class Site:
                     r = (200, {}, r)
                 code, headers, body = r
                 if isinstance(body, str):
-                    body = body.encode("utf-8")
+                    body = body.replace("{BASE}", outer.base).encode("utf-8")
                 self.send_response(code)
                 items = headers.items() if isinstance(headers, dict) else headers
                 if not any(k.lower() == "content-type" for k, _ in items):
@@ -106,7 +110,7 @@ def good_routes():
     """Routes of a healthy site: every check should pass. good_site() fills in robots.txt and the sitemap."""
     return {
         "/": html_page(head="<meta name='msvalidate.01' content='ABC123'>"),
-        "/pricing": html_page(title="Acme pricing and plans for teams", h1="Pricing"),
+        "/pricing": html_page(title="Acme pricing and plans for teams", h1="Pricing", path="/pricing"),
         "/robots.txt": (200, {"Content-Type": "text/plain"}, ROBOTS_OK),
         "/llms.txt": (200, {"Content-Type": "text/plain"}, "# Acme\n> Widgets\n"),
     }
