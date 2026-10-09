@@ -76,6 +76,8 @@ class CheckerOnTheDemoSite(unittest.TestCase):
             ("warn", "snippet and archive controls"),
             ("warn", "sitemap lastmod honesty"),
             ("warn", "Organization schema"),
+            ("warn", "image alt text"),
+            ("warn", "duplicate descriptions"),
         ])
 
     def test_the_named_agents_are_the_planted_ones(self):
@@ -101,7 +103,7 @@ class CheckerOnTheDemoSite(unittest.TestCase):
             self.assertIn(expected, names)
 
     def test_score_line(self):
-        self.assertEqual((self.res["scores"]["fail_count"], self.res["scores"]["warn_count"]), (4, 4))
+        self.assertEqual((self.res["scores"]["fail_count"], self.res["scores"]["warn_count"]), (4, 6))
 
 
 class GeneratedReport(unittest.TestCase):

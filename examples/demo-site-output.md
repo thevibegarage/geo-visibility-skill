@@ -13,9 +13,9 @@
 
 # AI readiness: http://127.0.0.1:8765
 
-Technical readiness: **71%** (4 failures, 4 warnings)
+Technical readiness: **75%** (4 failures, 6 warnings)
 
-## Must fix (8)
+## Must fix (10)
 
 | # | Severity | Area | Issue | Detail | Fix |
 |---|---|---|---|---|---|
@@ -27,19 +27,23 @@ Technical readiness: **71%** (4 failures, 4 warnings)
 | 6 | warn | indexing | snippet and archive controls | meta robots: nosnippet/max-snippet:0 (Google: also excluded from AI Overviews and AI Mode as direct input; Bing: respected for generative captions) | If this is not a deliberate opt-out, remove it: these directives limit how AI answers can quote or link the page. |
 | 7 | warn | discovery | sitemap lastmod honesty | 0/13 stamped today; 13/13 share 2026-03-02. Looks generated or bulk-updated rather than real edit dates. | Emit each page's real updated date, or omit lastmod. |
 | 8 | warn | schema | Organization schema | missing on homepage | Add Organization JSON-LD with name, url, logo and sameAs (assets/schema-templates.md). |
+| 9 | warn | onpage | image alt text | /blog/crm-for-agencies: 1 of 1 images have no alt attribute (for example /team.png) | Describe each image in alt text, or use alt="" for purely decorative images. |
+| 10 | warn | onpage | duplicate descriptions | /, /features, /blog/crm-for-agencies share "meridian crm is a crm for mid-size agencies that want one pi" | Write a distinct description for each page. |
 
 ## Worth checking (not scored)
 
 - **llms.txt**: not found (HTTP 404) — Optional. Add after basics (assets/llms-txt-template.md). No proven ranking effect.
+- **social tags**: /, /features, /blog/crm-for-agencies: no Open Graph tags — Add og:title, og:description and og:image (and twitter:card) so shared links get a proper preview.
 - **Bing Webmaster Tools verification**: no msvalidate.01 meta tag or BingSiteAuth.xml found (a DNS CNAME or Search Console import also verifies a site) — Verify the site in Bing Webmaster Tools, submit the sitemap, enable IndexNow, and read the AI Performance report.
 - **Google Search Console verification**: no google-site-verification meta tag found (a DNS record or file also verifies a site) — Verify the site in Google Search Console and submit the sitemap.
 - **IndexNow key file**: not checked (pass --indexnow-key KEY to verify /KEY.txt) — Enable IndexNow (Bing and other engines) and re-run with --indexnow-key to verify the key file.
 
-## Other notes (58 checks hidden: passing, routine, or listed above)
+## Other notes (84 checks hidden: passing, routine, or listed above)
 
 | Area | Check | Status | Detail | Fix |
 |---|---|---|---|---|
 | access | robots: GPTBot (training) | info | blocked on 4/4 tested URLs |  |
+| onpage | on-page checks: /pricing | info | not assessed: the HTML Googlebot receives is a JavaScript shell (see the render checks) |  |
 
 ---
 
@@ -63,6 +67,8 @@ The checker fetches every `--paths` page as a browser, as GPTBot, as two user-fe
 | `/pricing` is an empty JavaScript app shell for every agent | Must fix #3, and 0 words in every column above |
 | The homepage has no JSON-LD | Must fix #4 and #8 |
 | `/blog/crm-for-agencies` is a full page for Googlebot but a shell for Bingbot | Must fix #5, and the 0 in the Bingbot column |
+| The homepage, `/features` and the blog post share one meta description | Must fix #10, which names all three pages |
+| The blog post has an image with no alt text | Must fix #9 |
 | The homepage sets `nosnippet`, as an SEO plugin might | Must fix #6 |
 | Every sitemap entry has the same `lastmod` | Must fix #7 |
 | `/features` is a shell for a default fetch but full HTML for crawlers | Not a problem: the checker credits it as dynamic rendering by user agent (the pass row hidden by `--issues-only`; note the Default fetch column) |

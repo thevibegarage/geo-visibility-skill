@@ -20,9 +20,9 @@ python3 examples/demo_site.py &
 python3 geo-visibility/scripts/check_ai_readiness.py http://127.0.0.1:8765 --paths /pricing /features /blog/crm-for-agencies --issues-only
 ```
 
-Technical readiness: **71%** (4 failures, 4 warnings)
+Technical readiness: **75%** (4 failures, 6 warnings)
 
-#### Must fix (8)
+#### Must fix (10)
 
 | # | Severity | Area | Issue | Detail | Fix |
 |---|---|---|---|---|---|
@@ -34,6 +34,8 @@ Technical readiness: **71%** (4 failures, 4 warnings)
 | 6 | warn | indexing | snippet and archive controls | meta robots: nosnippet/max-snippet:0 (Google: also excluded from AI Overviews and AI Mode as direct input; Bing: respected for generative captions) | If this is not a deliberate opt-out, remove it: these directives limit how AI answers can quote or link the page. |
 | 7 | warn | discovery | sitemap lastmod honesty | 0/13 stamped today; 13/13 share 2026-03-02. Looks generated or bulk-updated rather than real edit dates. | Emit each page's real updated date, or omit lastmod. |
 | 8 | warn | schema | Organization schema | missing on homepage | Add Organization JSON-LD with name, url, logo and sameAs (assets/schema-templates.md). |
+| 9 | warn | onpage | image alt text | /blog/crm-for-agencies: 1 of 1 images have no alt attribute (for example /team.png) | Describe each image in alt text, or use alt="" for purely decorative images. |
+| 10 | warn | onpage | duplicate descriptions | /, /features, /blog/crm-for-agencies share "meridian crm is a crm for mid-size agencies that want one pi" | Write a distinct description for each page. |
 
 It tests the way AI agents see a site, not the way you do. The same run compared the words each agent received without running JavaScript:
 
@@ -156,7 +158,7 @@ We believe in shipping honest software. Status as of 2026-10-08:
 | Crawler tokens and user-agent formats for Googlebot, Bingbot (evergreen form), Applebot/Applebot-Extended, Meta (`meta-webindexer`, `meta-externalagent`, `meta-externalfetcher`), Amazon (`Amazonbot`, `Amzn-SearchBot`, `Amzn-User`), MistralAI-User, DuckAssistBot, Google-Extended | ✅ Checked against the vendors' own pages on 2026-10-07; the script reports the non-search ones as `info`. ⚠️ `Bytespider` (ByteDance): no vendor documentation found, from memory |
 | Bing/Copilot guidance (`bing-copilot.md`) | ✅ AI Performance report (10 Feb 2026) and its June 2026 additions, and `NOCACHE`/`NOARCHIVE` (22 Sep 2023 post, which says "Bing Chat"), checked against Microsoft's Bing blogs 2026-10-07; IndexNow requirements checked against indexnow.org. ⚠️ Still trade-press only: the four verification methods, the evergreen Bingbot string, "Bing recommends IndexNow over its APIs", "schema helps Microsoft's models" |
 | "Claude web search runs on Brave" | ⚠️ Not confirmed. Trade coverage says Anthropic's subprocessor list names Brave Search; Anthropic's own pages could not be read for confirmation on 2026-10-07, and one report says the list also names TurboPuffer for web search. The skill treats it as a hypothesis to test |
-| Automated test suite (`python3 -m unittest discover -s tests`, stdlib only, about 3 seconds) | ✅ 271 tests: both scripts, the robots matcher, the shipped robots template, the workflow's exit-code pipeline, the skill build, the demo site and its generated report, the README's links and excerpt. Every v0.1.2 fix has a regression test, and those tests fail against v0.1.1 |
+| Automated test suite (`python3 -m unittest discover -s tests`, stdlib only, about 3 seconds) | ✅ 326 tests: both scripts, the robots matcher, the shipped robots template, the workflow's exit-code pipeline, the skill build, the demo site and its generated report, the README's links and excerpt. Every v0.1.2 fix has a regression test, and those tests fail against v0.1.1 |
 | Per-agent rendering comparison and soft-404 checks in `check_ai_readiness.py` | ✅ Tested on a local mock site that routes by user agent (broken and fixed). ✅ Run on live sites during development, which surfaced a false "Organization schema missing" warning for `EducationalOrganization` and a duplicated homepage finding (both fixed). ✅ Reproducible on the demo site in `examples/`, whose output is regenerated and diffed by a test. ❌ Not yet tested on third-party stacks (WordPress, Next.js, Shopify) |
 | Full audit on a real brand (garagelabstech.com, plausible.io) | ✅ Run end-to-end |
 | Refusal of manipulative tactics (fake reviews, hidden AI-directed text) | ✅ Tested with fresh agents |
