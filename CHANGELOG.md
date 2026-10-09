@@ -6,6 +6,7 @@
 - **Claude Code plugin packaging.** `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` make the skill installable by name: `claude plugin marketplace add thevibegarage/geo-visibility-skill`, then `claude plugin install geo-visibility@geo-visibility`. The manifest points at the existing `geo-visibility/` folder, so nothing moved. Both files pass `claude plugin validate --strict`.
 - Tests for the packaging (`tests/test_plugin.py`): documented manifest rules, reserved-name checks, the plugin version staying in step with the latest released changelog entry, README install commands matching the manifest, and the official validator when the `claude` CLI is present (skipped in CI).
 - A release checklist in CONTRIBUTING.md.
+- A clearly labelled "Need help implementing this?" note in the README: the maintainers' services offer, kept out of the skill entirely. Tests fail if any file in the skill folder, or anything the checker prints, names a company or promotes anything.
 
 ## v0.2.0 — 2026-10-08
 

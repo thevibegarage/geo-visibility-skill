@@ -124,7 +124,7 @@ We believe in shipping honest software. Status as of 2026-10-08:
 | Crawler tokens and user-agent formats for Googlebot, Bingbot (evergreen form), Applebot/Applebot-Extended, Meta (`meta-webindexer`, `meta-externalagent`, `meta-externalfetcher`), Amazon (`Amazonbot`, `Amzn-SearchBot`, `Amzn-User`), MistralAI-User, DuckAssistBot, Google-Extended | ✅ Checked against the vendors' own pages on 2026-10-07; the script reports the non-search ones as `info`. ⚠️ `Bytespider` (ByteDance): no vendor documentation found, from memory |
 | Bing/Copilot guidance (`bing-copilot.md`) | ✅ AI Performance report (10 Feb 2026) and its June 2026 additions, and `NOCACHE`/`NOARCHIVE` (22 Sep 2023 post, which says "Bing Chat"), checked against Microsoft's Bing blogs 2026-10-07; IndexNow requirements checked against indexnow.org. ⚠️ Still trade-press only: the four verification methods, the evergreen Bingbot string, "Bing recommends IndexNow over its APIs", "schema helps Microsoft's models" |
 | "Claude web search runs on Brave" | ⚠️ Not confirmed. Trade coverage says Anthropic's subprocessor list names Brave Search; Anthropic's own pages could not be read for confirmation on 2026-10-07, and one report says the list also names TurboPuffer for web search. The skill treats it as a hypothesis to test |
-| Automated test suite (`python3 -m unittest discover -s tests`, stdlib only, about 3 seconds) | ✅ 192 tests: both scripts, the robots matcher, the shipped robots template, the workflow's exit-code pipeline, the skill build, the demo site and its generated report, the README's links and excerpt. Every v0.1.2 fix has a regression test, and those tests fail against v0.1.1 |
+| Automated test suite (`python3 -m unittest discover -s tests`, stdlib only, about 3 seconds) | ✅ 194 tests: both scripts, the robots matcher, the shipped robots template, the workflow's exit-code pipeline, the skill build, the demo site and its generated report, the README's links and excerpt. Every v0.1.2 fix has a regression test, and those tests fail against v0.1.1 |
 | Per-agent rendering comparison and soft-404 checks in `check_ai_readiness.py` | ✅ Tested on a local mock site that routes by user agent (broken and fixed). ✅ Run on live sites during development, which surfaced a false "Organization schema missing" warning for `EducationalOrganization` and a duplicated homepage finding (both fixed). ✅ Reproducible on the demo site in `examples/`, whose output is regenerated and diffed by a test. ❌ Not yet tested on third-party stacks (WordPress, Next.js, Shopify) |
 | Full audit on a real brand (garagelabstech.com, plausible.io) | ✅ Run end-to-end |
 | Refusal of manipulative tactics (fake reviews, hidden AI-directed text) | ✅ Tested with fresh agents |
@@ -171,6 +171,12 @@ tools/make_demo_report.py     # regenerates examples/demo-site-output.md
 - **Ongoing** — crawler and engine-behavior updates as vendors change (open an [engine-update issue](.github/ISSUE_TEMPLATE/engine-update.md) when you spot one)
 
 If this repo saved you time, a ⭐ helps other people find it, which is, fittingly, exactly how GEO works.
+
+## Need help implementing this?
+
+This skill is free and MIT licensed, and it works without us. If you would rather have a team implement the fixes it finds, or set up and run the monthly program for you, [Garage Labs Technologies](https://www.garagelabstech.com) can help.
+
+That is a services offer from the maintainers. It appears in this README only: nothing the skill prints, recommends or generates ever promotes it, and a test fails if that changes.
 
 ## Contributing
 
