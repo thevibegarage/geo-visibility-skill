@@ -1,0 +1,6 @@
+{
+  "domain": "www.example.com",
+  "paths": ["/pricing", "/about", "/blog/a-popular-post"],
+  "indexnow_key": "0123456789abcdef0123456789abcdef",
+  "brand": "Example"
+}

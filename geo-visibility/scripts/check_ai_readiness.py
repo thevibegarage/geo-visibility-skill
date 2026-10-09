@@ -3,7 +3,8 @@
 
 Usage:
     python check_ai_readiness.py example.com [--paths /pricing /about] [--json out.json]
-                                 [--indexnow-key KEY] [--fail-on {none,fail}] [--issues-only]
+                                 [--indexnow-key KEY] [--fail-on {none,fail}] [--issues-only] [--config FILE]
+    python check_ai_readiness.py            # reads domain, paths and IndexNow key from ./geo-visibility.json
 
 Checks:
   * robots.txt rules for AI and search agents (search, user-fetch, training groups), evaluated
@@ -32,10 +33,12 @@ are merged), then unscored open points, then every check. --issues-only replaces
 only the rows the first two sections do not already show. The JSON output
 carries the same lists as "must_fix" and "worth_checking".
 Exit codes: 0 ok, 1 failures found (with --fail-on fail), 2 unreachable, 3 homepage returned an
-HTTP error (checks stop: there is no content to assess).
+HTTP error (checks stop: there is no content to assess), 4 settings or usage problem (no domain,
+unusable geo-visibility.json).
 """
 import argparse
 import json
+import os
 import re
 import sys
 import urllib.error
@@ -43,6 +46,9 @@ import urllib.request
 import zlib
 from html.parser import HTMLParser
 from urllib.parse import urljoin, urlparse
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # sibling module, however the script is loaded
+import geo_config  # noqa: E402
 
 
 def _bot_ua(name, version="1.0", url=None):
@@ -871,8 +877,9 @@ def to_markdown(res, issues_only=False):
 
 def main(argv=None):
     ap = argparse.ArgumentParser()
-    ap.add_argument("domain")
-    ap.add_argument("--paths", nargs="*", default=[])
+    ap.add_argument("domain", nargs="?", help="site to check; optional when geo-visibility.json names a domain")
+    ap.add_argument("--config", help="settings file (default: ./geo-visibility.json when present); arguments override it")
+    ap.add_argument("--paths", nargs="*", default=None)
     ap.add_argument("--json")
     ap.add_argument("--indexnow-key", help="verify the IndexNow key file at /KEY.txt")
     ap.add_argument("--fail-on", choices=("none", "fail"), default="none",
@@ -881,7 +888,18 @@ def main(argv=None):
                     help="short report: Must fix, Worth checking and a few other notes, without repeating them or listing passing checks "
                          "(the JSON output keeps every check)")
     a = ap.parse_args(argv)
-    res = check(a.domain, a.paths, a.indexnow_key)
+    try:
+        cfg = geo_config.load(a.config)
+    except geo_config.ConfigError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 4
+    domain = a.domain or cfg.get("domain")
+    if not domain:
+        print('error: no domain given. Pass one, or create geo-visibility.json with a "domain" '
+              "(see examples/geo-visibility.json).", file=sys.stderr)
+        return 4
+    paths = a.paths if a.paths is not None else cfg.get("paths", [])
+    res = check(domain, paths, a.indexnow_key or cfg.get("indexnow_key"))
     print(to_markdown(res, a.issues_only))
     if a.json:
         with open(a.json, "w") as fh:
