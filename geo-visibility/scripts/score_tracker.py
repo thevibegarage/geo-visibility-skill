@@ -3,6 +3,7 @@
 
 Usage:
     python score_tracker.py tracker.csv --brand "Acme" [--domain acme.com] [--compare previous.csv] [--by-stage]
+                            [--config FILE]   # brand and domain default to geo-visibility.json
 
 CSV columns (header required; see assets/visibility-tracker.csv):
     prompt_id,stage,prompt,engine,mode,run,mentioned,cited,position,sentiment,accurate,competitors,cited_domains
@@ -23,9 +24,13 @@ Sentiment mix is the share of rows whose (majority) sentiment is positive / neut
 """
 import argparse
 import csv
+import os
 import statistics
 import sys
 from collections import Counter, defaultdict
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # sibling module, however the script is loaded
+import geo_config  # noqa: E402
 
 REQUIRED = ("prompt_id", "engine", "mentioned", "cited")
 TRUE = {"1", "true", "yes", "y", "t", "x", "✓", "✔"}
@@ -276,11 +281,18 @@ def fmt_stage(res):
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("csv")
-    ap.add_argument("--brand", default="")
+    ap.add_argument("--brand", default=None)
     ap.add_argument("--domain", help="brand domain; derives a blank `cited` from cited_domains")
+    ap.add_argument("--config", help="settings file (default: ./geo-visibility.json when present); arguments override it")
     ap.add_argument("--compare")
     ap.add_argument("--by-stage", action="store_true", help="also print mention/citation/share of voice per funnel stage")
     a = ap.parse_args(argv)
+    try:
+        cfg = geo_config.load(a.config)
+    except geo_config.ConfigError as e:
+        sys.exit(f"ERROR: {e}")
+    a.brand = a.brand if a.brand is not None else cfg.get("brand", "")
+    a.domain = a.domain or cfg.get("domain")
     raw = load(a.csv)
     check_input(raw, a.csv)
     rows = collapse(normalize(raw), a.domain)

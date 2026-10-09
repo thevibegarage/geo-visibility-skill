@@ -15,7 +15,8 @@ try:
 except ImportError:  # PyYAML is optional; the workflow-syntax test is skipped without it
     yaml = None
 
-SCRIPTS = [os.path.join(SKILL, "scripts", n) for n in ("check_ai_readiness.py", "score_tracker.py")]
+SCRIPTS = [os.path.join(SKILL, "scripts", n) for n in ("check_ai_readiness.py", "score_tracker.py", "geo_config.py")]
+SIBLINGS = {n[:-3] for n in os.listdir(os.path.join(SKILL, "scripts")) if n.endswith(".py")}  # the scripts import each other
 
 
 def read(*parts):
@@ -79,7 +80,8 @@ class ReadmeAndExamples(unittest.TestCase):
     def test_readme_excerpt_is_verbatim_from_the_demo_output(self):
         """The README shows 'real, unedited output': every table row it shows must exist in the demo file."""
         demo = read(self.DEMO)
-        rows = [l for l in read(ROOT, "README.md").splitlines() if re.match(r"\| (\d+ \||`/|Page \|)", l) or l.startswith("Technical readiness:")]
+        section = read(ROOT, "README.md").split("## See it work")[1].split("## Quick start")[0]
+        rows = [l for l in section.splitlines() if re.match(r"\| (\d+ \||`/|Page \|)", l) or l.startswith("Technical readiness:")]
         self.assertGreaterEqual(len(rows), 12)  # score line + 8 Must fix rows + the words-per-agent table
         for row in rows:
             self.assertIn(row, demo, f"README row not found in the demo output: {row[:80]}")
@@ -203,7 +205,7 @@ class Scripts(unittest.TestCase):
                 names = [a.name.split(".")[0] for a in node.names] if isinstance(node, ast.Import) else \
                         [node.module.split(".")[0]] if isinstance(node, ast.ImportFrom) and node.module else []
                 for n in names:
-                    if stdlib is not None:
+                    if stdlib is not None and n not in SIBLINGS:
                         self.assertIn(n, stdlib, f"{os.path.basename(path)} imports non-stdlib {n}")
 
     def test_syntax_is_python_38_compatible(self):
@@ -212,6 +214,8 @@ class Scripts(unittest.TestCase):
 
     def test_help_runs(self):
         for path in SCRIPTS:
+            if os.path.basename(path) == "geo_config.py":  # a library module, not a command
+                continue
             p = subprocess.run([sys.executable, path, "--help"], capture_output=True, text=True)
             self.assertEqual(p.returncode, 0, p.stderr)
             self.assertIn("usage", p.stdout.lower())

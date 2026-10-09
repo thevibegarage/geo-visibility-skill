@@ -69,6 +69,34 @@ python3 geo-visibility/scripts/check_ai_readiness.py yourdomain.com --paths /pri
 
 On macOS with a python.org Python, a `CERTIFICATE_VERIFY_FAILED` result means Python has no root certificates: run `Install Certificates.command` or set `SSL_CERT_FILE=/etc/ssl/cert.pem`.
 
+### Commands (Claude Code plugin)
+
+The plugin adds four slash commands so you do not have to know what to ask:
+
+| Command | What it does |
+|---|---|
+| `/geo-visibility:audit <domain> [/path ...]` | A full audit that follows the skill's workflow and opens its report with the checker's **Must fix** table |
+| `/geo-visibility:check [domain] [/path ...]` | Runs the readiness checker and explains what to fix first |
+| `/geo-visibility:track <tracker.csv> [previous.csv]` | Rolls up your prompt-run CSV, with month-over-month deltas when you give last month's file |
+| `/geo-visibility:diagnose <symptom>` | A short diagnosis for one symptom: `chatgpt`, `copilot`, `claude`, `gemini`, `perplexity`, `wrong-facts` or `cited-not-recommended` |
+
+They start only when you type them, so they never compete with the main skill, and they treat what you type as data: a value with shell characters in it is refused, not run. They come with the plugin install, not with the `.skill` download.
+
+### Settings file
+
+Put a `geo-visibility.json` in the folder you work from and neither the commands nor the scripts need to ask for the same things again:
+
+```json
+{
+  "domain": "www.example.com",
+  "paths": ["/pricing", "/about", "/blog/a-popular-post"],
+  "indexnow_key": "0123456789abcdef0123456789abcdef",
+  "brand": "Example"
+}
+```
+
+Command-line arguments always win over the file, and an unknown key is an error so a typo cannot quietly audit nothing. With the file in place, `python3 geo-visibility/scripts/check_ai_readiness.py` needs no arguments. See [`examples/geo-visibility.json`](examples/geo-visibility.json).
+
 ## How it works
 
 ```mermaid
@@ -102,6 +130,10 @@ flowchart LR
 
 Fork this repo, enable Actions on the fork (GitHub does not run scheduled workflows on forks until you do, and pauses them after 60 days of inactivity), set a `GEO_DOMAIN` repository variable (Settings → Secrets and variables → Actions → Variables), and [the included workflow](.github/workflows/ai-readiness.yml) checks your site every Monday and puts the Must fix table in the run summary. It fails the run if a crawler is refused, the sitemap is missing, a page is `noindex`, or the site is unreachable. Optional variables: `GEO_PATHS` (detail pages to compare across agents) and `GEO_INDEXNOW_KEY`. If your WAF challenges GitHub's datacenter IPs, the run reports "homepage returned HTTP 403" and stops instead of inventing findings.
 
+## Security
+
+[SECURITY.md](SECURITY.md) lists exactly what the scripts do (they request only the site you point them at and the sitemap URLs it lists, send nothing anywhere, and use no dependencies), and a test enforces each of those statements. Point the checker only at sites you own or may test: it sends requests that carry crawler user-agent strings.
+
 ## Engine and crawler coverage
 
 | Surface | Playbook | Crawler / robots checks | Tracker | First-party data |
@@ -124,7 +156,7 @@ We believe in shipping honest software. Status as of 2026-10-08:
 | Crawler tokens and user-agent formats for Googlebot, Bingbot (evergreen form), Applebot/Applebot-Extended, Meta (`meta-webindexer`, `meta-externalagent`, `meta-externalfetcher`), Amazon (`Amazonbot`, `Amzn-SearchBot`, `Amzn-User`), MistralAI-User, DuckAssistBot, Google-Extended | ✅ Checked against the vendors' own pages on 2026-10-07; the script reports the non-search ones as `info`. ⚠️ `Bytespider` (ByteDance): no vendor documentation found, from memory |
 | Bing/Copilot guidance (`bing-copilot.md`) | ✅ AI Performance report (10 Feb 2026) and its June 2026 additions, and `NOCACHE`/`NOARCHIVE` (22 Sep 2023 post, which says "Bing Chat"), checked against Microsoft's Bing blogs 2026-10-07; IndexNow requirements checked against indexnow.org. ⚠️ Still trade-press only: the four verification methods, the evergreen Bingbot string, "Bing recommends IndexNow over its APIs", "schema helps Microsoft's models" |
 | "Claude web search runs on Brave" | ⚠️ Not confirmed. Trade coverage says Anthropic's subprocessor list names Brave Search; Anthropic's own pages could not be read for confirmation on 2026-10-07, and one report says the list also names TurboPuffer for web search. The skill treats it as a hypothesis to test |
-| Automated test suite (`python3 -m unittest discover -s tests`, stdlib only, about 3 seconds) | ✅ 194 tests: both scripts, the robots matcher, the shipped robots template, the workflow's exit-code pipeline, the skill build, the demo site and its generated report, the README's links and excerpt. Every v0.1.2 fix has a regression test, and those tests fail against v0.1.1 |
+| Automated test suite (`python3 -m unittest discover -s tests`, stdlib only, about 3 seconds) | ✅ 234 tests: both scripts, the robots matcher, the shipped robots template, the workflow's exit-code pipeline, the skill build, the demo site and its generated report, the README's links and excerpt. Every v0.1.2 fix has a regression test, and those tests fail against v0.1.1 |
 | Per-agent rendering comparison and soft-404 checks in `check_ai_readiness.py` | ✅ Tested on a local mock site that routes by user agent (broken and fixed). ✅ Run on live sites during development, which surfaced a false "Organization schema missing" warning for `EducationalOrganization` and a duplicated homepage finding (both fixed). ✅ Reproducible on the demo site in `examples/`, whose output is regenerated and diffed by a test. ❌ Not yet tested on third-party stacks (WordPress, Next.js, Shopify) |
 | Full audit on a real brand (garagelabstech.com, plausible.io) | ✅ Run end-to-end |
 | Refusal of manipulative tactics (fake reviews, hidden AI-directed text) | ✅ Tested with fresh agents |
@@ -157,6 +189,8 @@ geo-visibility/
 │                             #   tracker CSV, report template
 └── evals/                    # test prompts with assertions, and graded results
 .claude-plugin/               # plugin manifest + marketplace file (install by name in Claude Code)
+skills/                       # the four slash commands (plugin install only)
+SECURITY.md                   # what the scripts do, and how to report a problem
 examples/                     # a flawed demo site + the checker's real output on it,
                               #   and an illustrative full report
 tests/                        # stdlib unittest suite for the scripts, templates and docs
