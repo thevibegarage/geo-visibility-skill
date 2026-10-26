@@ -20,7 +20,7 @@ python3 examples/demo_site.py &
 python3 geo-visibility/scripts/check_ai_readiness.py http://127.0.0.1:8765 --paths /pricing /features /blog/crm-for-agencies --issues-only
 ```
 
-Technical readiness: **75%** (4 failures, 7 warnings)
+Technical readiness: **76%** (4 failures, 7 warnings)
 
 #### Must fix (11)
 
@@ -71,6 +71,22 @@ python3 geo-visibility/scripts/check_ai_readiness.py yourdomain.com --paths /pri
 ```
 
 On macOS with a python.org Python, a `CERTIFICATE_VERIFY_FAILED` result means Python has no root certificates: run `Install Certificates.command` or set `SSL_CERT_FILE=/etc/ssl/cert.pem`.
+
+### Crawl mode (`--crawl`)
+
+Add `--crawl` and the checker also follows your site's own links, as Googlebot, to find what a page-by-page check cannot:
+
+```bash
+python3 geo-visibility/scripts/check_ai_readiness.py yourdomain.com --crawl --issues-only      # up to 50 requests
+python3 geo-visibility/scripts/check_ai_readiness.py yourdomain.com --crawl 200 --issues-only  # up to 200 (the maximum is 500)
+```
+
+- **Broken internal links** (a failure, naming the pages that link to them), **redirect chains** (two or more hops warn; a loop, or more than five hops, fails) and links that redirect once (listed, not scored).
+- **Click depth** from the homepage, and **orphan pages**: sitemap URLs that no crawled page links to.
+- **Bounded and polite.** At most N requests and five minutes, one request at a time with a short pause, your own host only, never a URL that robots.txt disallows for Googlebot, and it stops at the first HTTP 429. It is off by default. [SECURITY.md](SECURITY.md) lists the limits and tests enforce them.
+- **Honest about gaps.** It reads the HTML Googlebot is sent, so links built with JavaScript are invisible. When the limit ends the crawl early, or a crawled page shows under 50 words without JavaScript, orphan pages are reported as "not assessed" instead of guessed. `rel="nofollow"` is not considered: every link counts as a link.
+
+The demo site has planted link problems too; its report shows [what `--crawl` finds there](examples/demo-site-output.md#crawl-mode-what---crawl-adds), including the orphan check declining to guess.
 
 ### Commands (Claude Code plugin)
 
@@ -123,7 +139,7 @@ flowchart LR
 
 | Piece | What it does |
 |---|---|
-| `scripts/check_ai_readiness.py` | **Must fix** table (failures first, merged per-agent rows, concrete fixes), **Worth checking** list, then every check. Robots rules (wildcards, longest match, group semantics) for AI and search agents, WAF behavior, per-agent rendering, soft 404s, sitemaps (indexes, gzip), JSON-LD, snippet and archive controls, Bing/Google verification hints, IndexNow. `--issues-only`, `--fail-on fail`, JSON output |
+| `scripts/check_ai_readiness.py` | **Must fix** table (failures first, merged per-agent rows, concrete fixes), **Worth checking** list, then every check. Robots rules (wildcards, longest match, group semantics) for AI and search agents, WAF behavior, per-agent rendering, soft 404s, sitemaps (indexes, gzip), JSON-LD, snippet and archive controls, Bing/Google verification hints, IndexNow. `--issues-only`, `--fail-on fail`, JSON output, and an opt-in `--crawl` (broken links, redirect chains, click depth, orphan pages) |
 | `scripts/score_tracker.py` | Rolls your prompt-run CSV into mention rate, citation rate, share of voice, sentiment mix and a cited-domain list, per engine and per mode (search vs no-search). `--by-stage`, `--domain`, `--compare` for month-over-month deltas. Reads 1/0 or TRUE/FALSE straight from a spreadsheet |
 | `references/` | 10 playbooks: engines, Bing/Copilot, prompt audit, technical readiness, content patterns, off-site authority, SEO foundation, verticals, measurement, evidence tiers |
 | `assets/` | robots.txt (verified to keep private paths closed for every named bot), llms.txt, JSON-LD templates, tracker CSV, report template |
@@ -135,7 +151,7 @@ Fork this repo, enable Actions on the fork (GitHub does not run scheduled workfl
 
 ## Security
 
-[SECURITY.md](SECURITY.md) lists exactly what the scripts do (they request only the site you point them at and the sitemap URLs it lists, send nothing anywhere, and use no dependencies), and a test enforces each of those statements. Point the checker only at sites you own or may test: it sends requests that carry crawler user-agent strings.
+[SECURITY.md](SECURITY.md) lists exactly what the scripts do (they request only the site you point them at and the sitemap URLs it lists, send nothing anywhere, and use no dependencies; the opt-in `--crawl` stays on that host, honours robots.txt for Googlebot and is capped in requests and time), and a test enforces each of those statements. Point the checker only at sites you own or may test: it sends requests that carry crawler user-agent strings.
 
 ## Engine and crawler coverage
 
@@ -159,7 +175,7 @@ We believe in shipping honest software. Status as of 2026-10-08:
 | Crawler tokens and user-agent formats for Googlebot, Bingbot (evergreen form), Applebot/Applebot-Extended, Meta (`meta-webindexer`, `meta-externalagent`, `meta-externalfetcher`), Amazon (`Amazonbot`, `Amzn-SearchBot`, `Amzn-User`), MistralAI-User, DuckAssistBot, Google-Extended | ✅ Checked against the vendors' own pages on 2026-10-07; the script reports the non-search ones as `info`. ⚠️ `Bytespider` (ByteDance): no vendor documentation found, from memory |
 | Bing/Copilot guidance (`bing-copilot.md`) | ✅ AI Performance report (10 Feb 2026) and its June 2026 additions, and `NOCACHE`/`NOARCHIVE` (22 Sep 2023 post, which says "Bing Chat"), checked against Microsoft's Bing blogs 2026-10-07; IndexNow requirements checked against indexnow.org. ⚠️ Still trade-press only: the four verification methods, the evergreen Bingbot string, "Bing recommends IndexNow over its APIs", "schema helps Microsoft's models" |
 | "Claude web search runs on Brave" | ⚠️ Not confirmed. Trade coverage says Anthropic's subprocessor list names Brave Search; Anthropic's own pages could not be read for confirmation on 2026-10-07, and one report says the list also names TurboPuffer for web search. The skill treats it as a hypothesis to test |
-| Automated test suite (`python3 -m unittest discover -s tests`, stdlib only, about 3 seconds) | ✅ 370 tests: both scripts, the robots matcher, the shipped robots template, the workflow's exit-code pipeline, the skill build, the demo site and its generated report, the README's links and excerpt. Every v0.1.2 fix has a regression test, and those tests fail against v0.1.1 |
+| Automated test suite (`python3 -m unittest discover -s tests`, stdlib only, about 3 seconds) | ✅ 468 tests: both scripts, the robots matcher, the shipped robots template, the bounded crawl, the workflow's exit-code pipeline, the skill build, the demo site and its generated report, the README's links and excerpt. Every v0.1.2 fix has a regression test, and those tests fail against v0.1.1 |
 | Per-agent rendering comparison and soft-404 checks in `check_ai_readiness.py` | ✅ Tested on a local mock site that routes by user agent (broken and fixed). ✅ Run on live sites during development, which surfaced a false "Organization schema missing" warning for `EducationalOrganization` and a duplicated homepage finding (both fixed). ✅ Reproducible on the demo site in `examples/`, whose output is regenerated and diffed by a test. ❌ Not yet tested on third-party stacks (WordPress, Next.js, Shopify) |
 | Full audit on a real brand (garagelabstech.com, plausible.io) | ✅ Run end-to-end |
 | Refusal of manipulative tactics (fake reviews, hidden AI-directed text) | ✅ Tested with fresh agents |
@@ -204,7 +220,7 @@ tools/trigger_sim.py          # simulated activation test (does a model pick thi
 
 ## Roadmap
 
-- **v0.4** — a bounded crawl (broken links, redirect chains, orphan pages, click depth); a `--repo` scan of your code for rules that name Googlebot but not Bingbot; a computed "fix these and reach X%" score; a shareable HTML report with a computed grade; Bing AI Performance CSV import
+- **v0.4** — shipped so far: the bounded crawl (`--crawl`: broken links, redirect chains, orphan pages, click depth). Still to come: a `--repo` scan of your code for rules that name Googlebot but not Bingbot; a computed "fix these and reach X%" score; a shareable HTML report with a computed grade; Bing AI Performance CSV import
 - **Carried over** — re-run evals 1-5 and add more; outcome data from real monthly re-tests; run the checker on WordPress, Next.js and Shopify stacks; confirm or retire the Brave hypothesis; optional API runners for prompt sets (OpenAI web search, Perplexity Sonar, Gemini grounding)
 - **Later** — multi-language prompt-audit templates (starting with Hindi/Hinglish); more vertical playbooks from community PRs
 - **Ongoing** — crawler and engine-behavior updates as vendors change (open an [engine-update issue](.github/ISSUE_TEMPLATE/engine-update.md) when you spot one)

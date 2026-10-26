@@ -4,6 +4,7 @@
 Usage:
     python check_ai_readiness.py example.com [--paths /pricing /about] [--json out.json]
                                  [--indexnow-key KEY] [--fail-on {none,fail}] [--issues-only] [--config FILE]
+                                 [--crawl [N]]
     python check_ai_readiness.py            # reads domain, paths and IndexNow key from ./geo-visibility.json
 
 Checks:
@@ -23,6 +24,11 @@ Checks:
     title, meta description, h1 count, JSON-LD types, visible text in the raw HTML (proxy for
     "readable without JavaScript")
   * Bing/Google webmaster verification hints and, with --indexnow-key, the IndexNow key file
+  * With --crawl [N] (off by default): a bounded crawl of up to N requests (default 50, at most 500) that follows the
+    site's own links as Googlebot, one request at a time, honouring robots.txt and never leaving the audited host. It
+    reports broken internal links, redirect chains, click depth and sitemap URLs that no page links to (orphans).
+    Anything it could not see (the limit was reached, or a page shows under 50 words without JavaScript and may add its links
+    with JavaScript) is "not assessed".
 
 The score weights each check once: per-agent rows (robots, WAF, soft 404) collapse to the worst
 row in their group, so a wall of trivial passes cannot hide a failure.
@@ -50,6 +56,7 @@ from urllib.parse import urljoin, urlparse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # sibling module, however the script is loaded
 import geo_config  # noqa: E402
+import link_crawl  # noqa: E402
 import seo_checks  # noqa: E402
 
 
@@ -125,6 +132,7 @@ HREFLANG_FETCH_LIMIT = 10  # alternate pages fetched per run to verify return li
 SHELL_WORDS = 150  # below this a page is "thin"; see render_by_agent for how short real pages are handled
 SITEMAP_MAX = 50_000_000  # sitemaps may be 50 MB uncompressed
 SITEMAP_SAMPLE = 5  # child sitemaps fetched from a sitemap index
+CRAWL_DELAY = 0.1  # seconds between crawl requests: sequential and unhurried, so a crawl never looks like a load test
 
 
 def kind(agent_name):
@@ -189,6 +197,30 @@ def probe(url, ua=BROWSER_UA):
         return e.code, (e.headers.get("Location", "") if e.headers else ""), ""
     except Exception as e:
         return 0, "", str(e)
+
+
+def crawl_get(url, ua=None):
+    """The crawler's one request: redirects are not followed, and the body is read only for a 200 HTML page.
+
+    Returns (status, Location header, html or None, error); status 0 means a network error.
+    """
+    ua = ua or AGENTS["search_and_user_fetch"]["Googlebot"]
+    req = urllib.request.Request(url, headers={"User-Agent": ua, "Accept": "text/html,application/xhtml+xml,*/*;q=0.8"})
+    try:
+        with _NO_FOLLOW.open(req, timeout=TIMEOUT) as r:
+            html = None
+            if r.status == 200 and r.headers.get_content_type() in ("text/html", "application/xhtml+xml"):
+                html = _decode(r.read(2_000_000))
+            return r.status, r.headers.get("Location", ""), html, ""
+    except urllib.error.HTTPError as e:
+        return e.code, (e.headers.get("Location", "") if e.headers else ""), None, ""
+    except Exception as e:
+        return 0, "", None, str(e)
+
+
+def _is_shell(html):
+    """Whether a page shows so little text without JavaScript that any links it adds with JavaScript would be invisible."""
+    return count_words(" ".join(parse_page(html).text)) < link_crawl.SHELL_WORDS
 
 
 def _http_variant(base):
@@ -524,7 +556,9 @@ def _locs(body):
 
 
 def check_sitemaps(base, from_robots, paths, add):
-    """Find a valid sitemap (robots.txt entries first, then /sitemap.xml), follow a sitemap index, check lastmod and --paths."""
+    """Find a valid sitemap (robots.txt entries first, then /sitemap.xml), follow a sitemap index, check lastmod and --paths.
+
+    Returns {"urls": [...], "complete": bool} (complete is False when a sitemap index was only partly read), or None."""
     candidates = list(dict.fromkeys(from_robots[:5] + [base + "/sitemap.xml"]))
     found = None
     for sm in candidates:
@@ -535,7 +569,7 @@ def check_sitemaps(base, from_robots, paths, add):
     if not found:
         add("discovery", "sitemap", "fail", "no valid sitemap found (tried " + ", ".join(candidates) + ")",
             "Publish sitemap.xml and reference it in robots.txt.")
-        return
+        return None
     sm, body = found
     urls, lastmod_src, complete = _locs(body), body, True
     if "<sitemapindex" in body:
@@ -573,13 +607,14 @@ def check_sitemaps(base, from_robots, paths, add):
                 "Add money pages to the sitemap so crawlers and IndexNow-style submissions include them.")
         else:
             add("discovery", "--paths listed in sitemap", "pass", f"all {len(paths)} paths present")
+    return {"urls": urls, "complete": complete}
 
 
 # ---------------------------------------------------------------------------------------------
 # Main check
 # ---------------------------------------------------------------------------------------------
 
-AREA_ORDER = {"access": 0, "render": 1, "indexing": 2, "discovery": 3, "schema": 4, "onpage": 5}
+AREA_ORDER = {"access": 0, "render": 1, "indexing": 2, "discovery": 3, "schema": 4, "onpage": 5, "links": 6}
 # Per-agent rows that share a group are listed once: (label, how to pull the agent name out of the check name)
 GROUP_LABELS = {
     "robots-agents": ("robots.txt blocks AI or search agents", lambda c: c.split(": ", 1)[1].split(" (")[0]),
@@ -681,7 +716,7 @@ def _tokens(value):
     return [t for t in re.split(r"[,\s]+", value.lower()) if t]
 
 
-def check(domain, paths, indexnow_key=None):
+def check(domain, paths, indexnow_key=None, crawl=0):
     raw = domain if domain.startswith("http") else f"https://{domain}"
     parsed = urlparse(raw)
     # Always test the site root: robots.txt, sitemap and llms.txt live there, even if the user passed a deep URL.
@@ -777,7 +812,7 @@ def check(domain, paths, indexnow_key=None):
             "Optional. Add after basics (assets/llms-txt-template.md). No proven ranking effect.")
 
     # --- sitemap ---
-    check_sitemaps(base, sitemaps, paths, add)
+    sitemap = check_sitemaps(base, sitemaps, paths, add)
 
     # --- homepage content ---
     p = parse_page(html0)
@@ -939,6 +974,17 @@ def check(domain, paths, indexnow_key=None):
             add("indexing", f"soft 404 ({name})", "warn", f"{u} -> HTTP {c}",
                 "Return 404 or 410 for unknown URLs; check why this agent got an unexpected status.", group="soft404")
 
+    # --- bounded crawl (opt-in): up to `crawl` requests to the audited host, as Googlebot, honouring robots.txt
+    if crawl and not robots_known:
+        add("links", link_crawl.SUMMARY, "info", "not run: robots.txt could not be read, so the crawl cannot tell which URLs Googlebot may fetch",
+            "Make /robots.txt answer reliably, then re-run with --crawl.")
+    elif crawl:
+        crawled = link_crawl.crawl(base + "/", crawl_get, lambda u: robots.can_fetch("Googlebot", u), _is_shell, crawl,
+                                   pause=lambda: time.sleep(CRAWL_DELAY))
+        for area, name, status, detail, fix in link_crawl.findings(crawled, sitemap):
+            add(area, name, status, detail, fix, group=f"crawl:{name}")
+        res["crawl"] = link_crawl.report_data(crawled, sitemap)
+
     # --- score: every check counts once; grouped rows collapse to the worst row in the group ---
     weights = {"pass": 1.0, "warn": 0.5, "fail": 0.0}
     units = {}
@@ -1020,7 +1066,17 @@ def main(argv=None):
     ap.add_argument("--issues-only", action="store_true",
                     help="short report: Must fix, Worth checking and a few other notes, without repeating them or listing passing checks "
                          "(the JSON output keeps every check)")
+    ap.add_argument("--crawl", nargs="?", const=str(link_crawl.DEFAULT_BUDGET), default=None, metavar="N",
+                    help=f"also crawl up to N requests (default {link_crawl.DEFAULT_BUDGET}, at most {link_crawl.MAX_BUDGET}) by following "
+                         "the site's own links as Googlebot: broken links, redirect chains, click depth, orphan pages. Off by default")
     a = ap.parse_args(argv)
+    budget = 0
+    if a.crawl is not None:
+        if not re.fullmatch(r"[0-9]+", a.crawl) or not 1 <= int(a.crawl) <= link_crawl.MAX_BUDGET:
+            print(f"error: --crawl takes a number of requests from 1 to {link_crawl.MAX_BUDGET} (got {a.crawl!r}); "
+                  "put the domain before --crawl", file=sys.stderr)
+            return 4
+        budget = int(a.crawl)
     try:
         cfg = geo_config.load(a.config)
     except geo_config.ConfigError as e:
@@ -1032,7 +1088,7 @@ def main(argv=None):
               "(see examples/geo-visibility.json).", file=sys.stderr)
         return 4
     paths = a.paths if a.paths is not None else cfg.get("paths", [])
-    res = check(domain, paths, a.indexnow_key or cfg.get("indexnow_key"))
+    res = check(domain, paths, a.indexnow_key or cfg.get("indexnow_key"), crawl=budget)
     print(to_markdown(res, a.issues_only))
     if a.json:
         with open(a.json, "w") as fh:

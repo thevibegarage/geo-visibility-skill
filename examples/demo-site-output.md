@@ -13,7 +13,7 @@
 
 # AI readiness: http://127.0.0.1:8765
 
-Technical readiness: **75%** (4 failures, 7 warnings)
+Technical readiness: **76%** (4 failures, 7 warnings)
 
 ## Must fix (11)
 
@@ -39,7 +39,7 @@ Technical readiness: **75%** (4 failures, 7 warnings)
 - **Google Search Console verification**: no google-site-verification meta tag found (a DNS record or file also verifies a site) — Verify the site in Google Search Console and submit the sitemap.
 - **IndexNow key file**: not checked (pass --indexnow-key KEY to verify /KEY.txt) — Enable IndexNow (Bing and other engines) and re-run with --indexnow-key to verify the key file.
 
-## Other notes (86 checks hidden: passing, routine, or listed above)
+## Other notes (88 checks hidden: passing, routine, or listed above)
 
 | Area | Check | Status | Detail | Fix |
 |---|---|---|---|---|
@@ -59,6 +59,24 @@ The checker fetches every `--paths` page as a browser, as GPTBot, as two user-fe
 | `/features` | 0 | 521 | 521 | 521 | 521 | 521 | pass |
 | `/blog/crm-for-agencies` | 643 | 643 | 643 | 643 | 643 | 0 | warn |
 
+## Crawl mode: what `--crawl` adds
+
+The links between the demo's pages are planted too. One more flag makes the checker follow them, as Googlebot, in at most 50 requests (what a bare `--crawl` allows; this run used 14):
+
+```bash
+python3 geo-visibility/scripts/check_ai_readiness.py http://127.0.0.1:8765 --paths /pricing /features /blog/crm-for-agencies --crawl --issues-only
+```
+
+Everything it adds is in the `links` area of the same report, and each crawl check is scored once like any other, so the score line becomes **73%** (5 failures, 8 warnings). These rows are copied from that run's JSON output:
+
+| Check | Status | Detail |
+|---|---|---|
+| internal link crawl | info | 11 HTML page(s) read in 14 request(s) (limit 50); 13 internal links; the deepest page is 8 click(s) from the start; 1 URL(s) not requested because robots.txt disallows Googlebot; 1 other host(s) linked, not requested; 1 page(s) show under 50 words without JavaScript, so links they add with JavaScript are invisible here |
+| broken internal links | fail | 1 internal link target(s) are broken: /blog/crm-comparison-2025 (HTTP 404, from /blog/crm-for-agencies) |
+| redirect chains | warn | 1 internal link target(s) need two or more redirects: /product (301) -> /products (302) -> /features (from /) |
+| click depth | info | 5 page(s) are more than 3 clicks from the start (3 is a rule of thumb, not a search-engine rule): /blog/post-7 (8); /blog/post-6 (7); /blog/post-5 (6); and 2 more |
+| orphan pages | info | not assessed: 1 crawled page(s) show under 50 words without JavaScript (for example /pricing), so a page that only their JavaScript links to would look unlinked |
+
 ## What was planted, and where the checker found it
 
 | Planted flaw | Where it shows up |
@@ -75,3 +93,8 @@ The checker fetches every `--paths` page as a browser, as GPTBot, as two user-fe
 | The homepage lists a German version at `/de`, and `/de` does not link back (hreflang) | Must fix #7, found by fetching the alternate |
 | `/features` is a shell for a default fetch but full HTML for crawlers | Not a problem: the checker credits it as dynamic rendering by user agent (the pass row hidden by `--issues-only`; note the Default fetch column) |
 | No Bing Webmaster Tools tag, no `llms.txt` | Worth checking |
+| The blog post links to a 2025 comparison page that has been removed | `--crawl`: `broken internal links` (a failure), naming the page that links to it |
+| "Product tour" goes `/product` to `/products` to `/features`, one permanent and one temporary redirect | `--crawl`: `redirect chains` (a warning) |
+| The blog series chains post-1 to post-7, so the last post is eight clicks from the homepage | `--crawl`: `click depth` (information, labelled a rule of thumb) |
+| Two sitemap URLs (post-8 and post-9) have no link pointing at them | `--crawl`: `orphan pages` says **not assessed**, because `/pricing` is a JavaScript shell whose links the crawl cannot see. It declines to guess |
+| A "Staff sign in" link into `/admin/`, and a partner link to another site | `--crawl`: neither is requested; the summary counts them |

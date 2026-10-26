@@ -15,7 +15,8 @@ try:
 except ImportError:  # PyYAML is optional; the workflow-syntax test is skipped without it
     yaml = None
 
-SCRIPTS = [os.path.join(SKILL, "scripts", n) for n in ("check_ai_readiness.py", "score_tracker.py", "geo_config.py")]
+SCRIPTS = [os.path.join(SKILL, "scripts", n) for n in sorted(os.listdir(os.path.join(SKILL, "scripts"))) if n.endswith(".py")]
+LIBRARIES = {"geo_config.py", "seo_checks.py", "link_crawl.py"}  # imported by the two commands, never run on their own
 SIBLINGS = {n[:-3] for n in os.listdir(os.path.join(SKILL, "scripts")) if n.endswith(".py")}  # the scripts import each other
 
 
@@ -106,7 +107,7 @@ class ReadmeAndExamples(unittest.TestCase):
         self.assertRegex(demo, r"\*\*[0-9]{2,3}%\*\* \(\d+ failures, \d+ warnings\)")
         n = int(re.search(r"## Must fix \((\d+)\)", demo).group(1))
         self.assertEqual(len(re.findall(r"^\| \d+ \| (?:fail|warn) \|", demo.split("## Worth checking")[0], re.M)), n)
-        for section in ("## Worth checking (not scored)", "## Other notes", "## Words each agent received", "## What was planted"):
+        for section in ("## Worth checking (not scored)", "## Other notes", "## Words each agent received", "## Crawl mode", "## What was planted"):
             self.assertIn(section, demo)
 
     def test_illustrative_report_is_clearly_labelled_and_points_to_the_demo(self):
@@ -234,7 +235,7 @@ class Scripts(unittest.TestCase):
 
     def test_help_runs(self):
         for path in SCRIPTS:
-            if os.path.basename(path) == "geo_config.py":  # a library module, not a command
+            if os.path.basename(path) in LIBRARIES:  # a library module, not a command
                 continue
             p = subprocess.run([sys.executable, path, "--help"], capture_output=True, text=True)
             self.assertEqual(p.returncode, 0, p.stderr)

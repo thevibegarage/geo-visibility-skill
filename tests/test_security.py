@@ -6,9 +6,11 @@ import os
 import tempfile
 import unittest
 
-from helpers import ROOT, SKILL, Site, ck, st, good_site
+from unittest import mock
 
-SCRIPTS = [os.path.join(SKILL, "scripts", n) for n in ("check_ai_readiness.py", "score_tracker.py", "geo_config.py")]
+from helpers import ROOT, SKILL, Site, ck, html_page, st, good_site
+
+SCRIPTS = [os.path.join(SKILL, "scripts", n) for n in sorted(os.listdir(os.path.join(SKILL, "scripts"))) if n.endswith(".py")]
 FORBIDDEN_MODULES = {"subprocess", "socket", "ctypes", "ftplib", "smtplib", "telnetlib", "http.client", "xmlrpc", "pickle",
                      "marshal", "shutil", "webbrowser", "multiprocessing", "asyncio"}
 FORBIDDEN_BUILTINS = {"eval", "exec", "compile", "__import__"}  # bare calls; re.compile is fine
@@ -53,6 +55,11 @@ class StaticClaims(unittest.TestCase):
         text = read(os.path.join(ROOT, "SECURITY.md"))
         for needle in ("No telemetry", "only when you pass `--json`", "Responsible use", "Prompt injection",
                        "Report a vulnerability", "Only the latest release is supported"):
+            self.assertIn(needle, text)
+
+    def test_security_md_describes_the_crawl_and_its_limits(self):
+        text = read(os.path.join(ROOT, "SECURITY.md"))
+        for needle in ("`--crawl`", "Googlebot", "robots.txt", "never another host", "HTTP 429", "link_crawl.py"):
             self.assertIn(needle, text)
 
 
@@ -107,6 +114,44 @@ class Runtime(unittest.TestCase):
                 with contextlib.redirect_stdout(io.StringIO()):
                     ck.main([s.base, "--json", "out.json"])
                 self.assertEqual(os.listdir(d), ["out.json"])
+            finally:
+                os.chdir(old)
+
+    def crawl_routes(self):
+        links = "".join(f'<a href="/p{i}">page {i}</a>' for i in range(12))
+        return {"/": html_page(body_extra=links + '<a href="https://elsewhere.example/x">out</a><a href="/leave">leave</a>'
+                                                   '<a href="https://www.127.0.0.1/twin">twin</a>'),
+                "/leave": (302, {"Location": "https://elsewhere.example/landing"}, "")}
+
+    def test_a_crawl_stays_on_the_target_host_and_inside_its_budget(self):
+        with mock.patch.object(ck, "CRAWL_DELAY", 0), good_site(extra=self.crawl_routes()) as s:
+            without = self.record_hosts(lambda: ck.check(s.base, ["/pricing"]))
+            crawled = self.record_hosts(lambda: ck.check(s.base, ["/pricing"], crawl=5))
+            target = s.base.split("//")[1]
+        self.assertEqual(set(crawled), {target})  # pages link to and redirect to other hosts; none was contacted
+        self.assertEqual(len(crawled) - len(without), 5)  # the budget is exact: a site with more pages gets no more requests
+
+    def test_a_crawl_never_requests_what_robots_txt_disallows_googlebot(self):
+        seen = []
+        robots = "User-agent: Googlebot\nDisallow: /g-only/\n\nUser-agent: *\nDisallow: /star-only/\n\nSitemap: {base}/sitemap.xml\n"
+        home = html_page(body_extra='<a href="/g-only/x">g</a><a href="/star-only/x">s</a><a href="/fine">f</a>')
+        with mock.patch.object(ck, "CRAWL_DELAY", 0), good_site(
+                extra={"/": home, "/robots.txt": lambda base: (200, {"Content-Type": "text/plain"}, robots.format(base=base)),
+                       "/g-only/x": "private", "/star-only/x": "allowed for Googlebot", "/fine": "ok"},
+                handler=lambda path, ua: seen.append(path)) as s:
+            res = ck.check(s.base, [], crawl=30)
+        self.assertNotIn("/g-only/x", seen)  # the group that names Googlebot applies to the crawl
+        self.assertIn("/star-only/x", seen)  # and the "*" group does not (a named group does not inherit it)
+        self.assertTrue(next(p for p in res["crawl"]["pages"] if p["url"].endswith("/g-only/x"))["blocked"])
+
+    def test_a_crawl_without_json_leaves_the_working_directory_unchanged(self):
+        old = os.getcwd()
+        with mock.patch.object(ck, "CRAWL_DELAY", 0), good_site(extra=self.crawl_routes()) as s, tempfile.TemporaryDirectory() as d:
+            os.chdir(d)
+            try:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    ck.main([s.base, "--crawl", "8"])
+                self.assertEqual(os.listdir(d), [])
             finally:
                 os.chdir(old)
 

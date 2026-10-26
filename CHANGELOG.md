@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **Bounded crawl: `--crawl [N]` (off by default).** Follows the site's own links as Googlebot and reports, in a new `links` area: **broken internal links** (a failure for 404, 410 and other client errors, naming the pages that link to them; a warning, not a failure, for 401, 403, 429, 5xx and network errors, which are often bot protection), **redirect chains** (two to five hops warn; a loop or more than five fail) with single redirects listed as unscored advice, **click depth** from the homepage (more than three clicks is reported as information, labelled a rule of thumb), and **orphan pages** (same-host sitemap URLs no crawled page links to, ignoring a trailing slash and http versus https). The JSON output gains a `crawl` section with the link graph (depth, status and inbound links per page) for a later report to draw.
+- **Hard limits, enforced by tests and listed in SECURITY.md:** at most N requests (default 50, never more than 500, redirects included) and five minutes; only the audited host is requested (a link or redirect to another host is recorded and left alone); a URL robots.txt disallows for Googlebot is never requested; the crawl does not start when robots.txt could not be read; a 429 ends it; requests are sequential with a 0.1 second pause; the body of a response is read only for an HTML page.
+- **The demo site now plants link problems** (a removed page, a two-step redirect, a deep blog series, a sign-in link into a robots-disallowed folder, a partner link), and `examples/demo-site-output.md` gains a "Crawl mode" section built from a real `--crawl` run. The orphan check there says "not assessed" because `/pricing` is a JavaScript shell; the report shows that on purpose. The links add two passing link-text checks, so the demo's score line reads 76%, not 75%; no finding changed.
+- **It says what it could not see.** When the limit ends the crawl early, or a crawled page shows under 50 words without JavaScript (so its JavaScript-built links are invisible), orphan pages are "not assessed" instead of guessed. `rel="nofollow"` is not considered.
+- A new module, `scripts/link_crawl.py`, holds the crawl logic and makes no requests itself; `check_ai_readiness.py` passes it a one-request function. 98 new tests (468 in total) drive it with a fake site, a local HTTP site, the command line and the demo site. 20 deliberate breakages (budget off by one, other hosts fetched, robots.txt ignored, redirects costing a click, no loop detection and others) each make the suite fail. Run on a live 90-page site: the crawl completed, and a sample of its statuses agreed with `curl`.
+
+### Changed
+- The static security and compatibility tests (standard library only, Python 3.8 syntax, no process or network modules) now cover every script in `scripts/`; `seo_checks.py` had not been on the list.
+
 ## v0.3.0 — 2026-10-09
 
 The checker now covers classic SEO (on-page tags, hreflang, URL hygiene) next to AI-crawler readiness, and the skill installs as a Claude Code plugin with four slash commands.

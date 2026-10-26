@@ -1,7 +1,9 @@
 import importlib.util
 import os
+import re
 import sys
 import unittest
+from unittest import mock
 
 from helpers import ROOT, ck
 
@@ -48,6 +50,15 @@ class DemoSiteBehaviour(unittest.TestCase):
         self.assertEqual(demo.respond("/", ua, "x")[0], 403)
         self.assertEqual(demo.respond("/nope", self.GOOGLE, "x")[0], 404)
 
+    def test_the_product_link_is_a_two_step_redirect_chain(self):
+        self.assertEqual(demo.respond("/product", self.GOOGLE, "x"), (301, "text/plain", "", {"Location": "/products"}))
+        self.assertEqual(demo.respond("/products", self.GOOGLE, "x"), (302, "text/plain", "", {"Location": "/features"}))
+
+    def test_links_do_not_change_how_many_words_a_page_has(self):
+        """The crawl demo adds links; the filler text shrinks to match, so the README's word counts stay exact."""
+        self.assertEqual(self.status_and_words("/", self.GOOGLE)[1], 402)
+        self.assertEqual(self.status_and_words("/blog/crm-for-agencies", self.GOOGLE)[1], 643)
+
     def test_word_helper_is_exact_and_deterministic(self):
         for n in (1, 40, 400, 643):
             self.assertEqual(len(demo.words(n).split()), n)
@@ -58,12 +69,37 @@ class CheckerOnTheDemoSite(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.server = demo.serve_in_background(0)
-        cls.res = ck.check(f"http://127.0.0.1:{cls.server.server_address[1]}", report.PATHS)
+        base = f"http://127.0.0.1:{cls.server.server_address[1]}"
+        cls.res = ck.check(base, report.PATHS)
+        with mock.patch.object(ck, "CRAWL_DELAY", 0):
+            cls.crawled = ck.check(base, report.PATHS, crawl=report.CRAWL_BUDGET)
 
     @classmethod
     def tearDownClass(cls):
         cls.server.shutdown()
         cls.server.server_close()
+
+    def test_crawl_mode_finds_the_planted_link_problems(self):
+        rows = {f["check"]: f for f in self.crawled["findings"] if f["area"] == "links"}
+        self.assertEqual({k: v["status"] for k, v in rows.items()}, {
+            "internal link crawl": "info", "broken internal links": "fail", "redirect chains": "warn", "click depth": "info",
+            "orphan pages": "info"})
+        self.assertIn("/blog/crm-comparison-2025 (HTTP 404, from /blog/crm-for-agencies)", rows["broken internal links"]["detail"])
+        self.assertIn("/product (301) -> /products (302) -> /features", rows["redirect chains"]["detail"])
+        self.assertIn("/blog/post-7 (8)", rows["click depth"]["detail"])
+        self.assertIn("not assessed", rows["orphan pages"]["detail"])  # /pricing is a shell, so the checker refuses to call anything an orphan
+        self.assertIn("/pricing", rows["orphan pages"]["detail"])
+        summary = rows["internal link crawl"]["detail"]
+        self.assertIn("1 URL(s) not requested because robots.txt disallows Googlebot", summary)  # /admin/login
+        self.assertIn("1 other host(s) linked, not requested", summary)  # partner.example
+
+    def test_the_crawl_changes_nothing_but_the_links_rows(self):
+        def rows(res):  # the soft-404 probe uses a random URL, and response times are a fresh measurement, on every run
+            return [(f["area"], f["check"], f["status"], re.sub(r"\d+ ms", "N ms", re.sub(r"geo-audit-missing-[a-z]{10}", "geo-audit-missing-X", f["detail"])))
+                    for f in res["findings"] if f["area"] != "links"]
+        self.assertEqual(rows(self.res), rows(self.crawled))
+        self.assertEqual(self.crawled["scores"]["fail_count"], self.res["scores"]["fail_count"] + 1)
+        self.assertEqual(self.crawled["scores"]["warn_count"], self.res["scores"]["warn_count"] + 1)
 
     def test_every_planted_flaw_is_reported_in_the_documented_order(self):
         got = [(e["status"], e["check"]) for e in self.res["must_fix"]]
