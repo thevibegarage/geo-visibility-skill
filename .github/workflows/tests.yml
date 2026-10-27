@@ -9,7 +9,9 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # Pinned, not ubuntu-latest: that label moved to Ubuntu 26.04, which has no Python 3.8 build for setup-python
+    # (3.8.18 exists for 20.04, 22.04 and 24.04), so the 3.8 job failed to start and took the whole matrix down.
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         python-version: ["3.8", "3.12"]
