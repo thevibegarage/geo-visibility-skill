@@ -18,6 +18,12 @@ Flaws planted on purpose (the checker should report every one):
   * the homepage, /features and the blog post share one meta description, and the blog post has an image with no alt text
   * the homepage declares a German version at /de (hreflang) that does not link back, so the pair is not reciprocal
   * no Bing Webmaster Tools verification tag and no llms.txt
+Planted for `--crawl` (the homepage and the blog posts now link to each other):
+  * the blog post links to a 2025 comparison page that has been removed (HTTP 404)
+  * the "Product tour" link goes /product -> /products -> /features: a chain of two redirects
+  * the blog series chains post-1 to post-7, so post-7 is eight clicks from the homepage; post-8 and post-9 are in the
+    sitemap but nothing links to them (the checker will not call them orphans, because /pricing is a shell whose links it cannot see)
+  * the "Staff sign in" link points into /admin/, which robots.txt disallows, and a partner link leaves the site: neither is requested
 Standard library only.
 """
 import sys
@@ -39,6 +45,11 @@ SHELL = ('<!doctype html><html lang="en"><head><title>Meridian CRM</title></head
          '<body><div id="root"></div><script src="/app.js"></script></body></html>')
 BLOG_URLS = ["/blog/crm-for-agencies"] + [f"/blog/post-{n}" for n in range(1, 10)]
 SITEMAP_URLS = ["/", "/pricing", "/features"] + BLOG_URLS
+HOME_LINKS = [("/pricing", "Pricing"), ("/features", "Features"), ("/product", "Product tour"), ("/blog/crm-for-agencies", "Blog"),
+              ("/admin/login", "Staff sign in"), ("https://partner.example/", "Integration partner directory")]
+BLOG_LINKS = {"/blog/crm-for-agencies": [("/blog/post-1", "Next in the series: choosing a CRM, part one"),
+                                         ("/blog/crm-comparison-2025", "Our 2025 CRM comparison")]}
+BLOG_LINKS.update({f"/blog/post-{n}": [(f"/blog/post-{n + 1}", f"Next in the series: choosing a CRM, part {n + 1}")] for n in range(1, 7)})
 
 
 def words(n):
@@ -51,17 +62,21 @@ def words(n):
     return " ".join(out[:n])
 
 
-def page(host, path, title, h1, n_words, head="", extra=""):
+def page(host, path, title, h1, n_words, head="", extra="", links=()):
+    """links: [(href, text)]. The filler shrinks by the words the links add, so a page's total word count is n_words plus its h1."""
+    nav = "<nav>" + "".join(f'<a href="{href}">{text}</a> ' for href, text in links) + "</nav>" if links else ""
+    n_words -= sum(len(text.split()) for _, text in links)
     return ('<!doctype html><html lang="en"><head><meta charset="utf-8">'
             f"<title>{title}</title>"
             '<meta name="description" content="Meridian CRM is a CRM for mid-size agencies that want one pipeline, one inbox and one source of truth.">'
             '<meta name="viewport" content="width=device-width, initial-scale=1">'
             f'<link rel="canonical" href="http://{host}{path}">{head}</head>'
-            f"<body><h1>{h1}</h1><p>{words(n_words)}</p>{extra}</body></html>")
+            f"<body><h1>{h1}</h1>{nav}<p>{words(n_words)}</p>{extra}</body></html>")
 
 
 def respond(path, ua, host):
-    """Return (status, content_type, body) for a request. Routing depends on the user agent, like many real sites."""
+    """Return (status, content_type, body) for a request, plus a dict of extra headers for a redirect. Routing depends on the user agent,
+    like many real sites."""
     path = path.split("?")[0]
     low = ua.lower()
     browser = "compatible" not in low
@@ -81,10 +96,14 @@ def respond(path, ua, host):
         alternates = "".join(f'<link rel="alternate" hreflang="{c}" href="http://{host}{p}">'
                              for c, p in (("en", "/"), ("de", "/de"), ("x-default", "/")))
         return 200, "text/html", page(host, path, "Meridian CRM: the CRM for mid-size agencies", "Meridian CRM", 400,
-                                      head='<meta name="robots" content="nosnippet">' + alternates)
+                                      head='<meta name="robots" content="nosnippet">' + alternates, links=HOME_LINKS)
     if path == "/de":  # names itself but not the English page: the return link is missing
         return 200, "text/html", page(host, path, "Meridian CRM auf Deutsch", "Meridian CRM auf Deutsch", 300,
                                       head=f'<link rel="alternate" hreflang="de" href="http://{host}/de">')
+    if path == "/product":  # two redirects in a row, and the second is temporary
+        return 301, "text/plain", "", {"Location": "/products"}
+    if path == "/products":
+        return 302, "text/plain", "", {"Location": "/features"}
     if path == "/pricing":
         return 200, "text/html", SHELL
     if path == "/features":
@@ -95,7 +114,7 @@ def respond(path, ua, host):
         if "bingbot" in low:
             return 200, "text/html", SHELL
         return 200, "text/html", page(host, path, "CRM for agencies: what to look for", "CRM for agencies", 640,
-                                      extra='<img src="/team.png" width="600" height="400">')
+                                      extra='<img src="/team.png" width="600" height="400">', links=BLOG_LINKS.get(path, ()))
     return 404, "text/plain", "Not found"
 
 
@@ -104,9 +123,11 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
     def do_GET(self):
-        status, ctype, body = respond(self.path, self.headers.get("User-Agent", ""), self.headers.get("Host", f"127.0.0.1:{PORT}"))
+        status, ctype, body, *extra = respond(self.path, self.headers.get("User-Agent", ""), self.headers.get("Host", f"127.0.0.1:{PORT}"))
         data = body.encode("utf-8")
         self.send_response(status)
+        for name, value in (extra[0] if extra else {}).items():
+            self.send_header(name, value)
         self.send_header("Content-Type", f"{ctype}; charset=utf-8")
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()

@@ -15,6 +15,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "examples", "demo-site-output.md")
 PATHS = ["/pricing", "/features", "/blog/crm-for-agencies"]
+CRAWL_BUDGET = 50  # what a bare --crawl allows, so the command shown in the report is exactly the one that was run
 AGENTS = [("browser", "Default fetch"), ("listed crawler (GPTBot)", "GPTBot"), ("user-fetch (Claude-User)", "Claude-User"),
           ("user-fetch (ChatGPT-User)", "ChatGPT-User"), ("search crawler (Googlebot)", "Googlebot"),
           ("search crawler (Bingbot)", "Bingbot")]
@@ -46,15 +47,20 @@ def build(port=0):
     """Run the checker against the demo site and return the markdown document (always shown on the documented port)."""
     demo = _load("demo_site", os.path.join("examples", "demo_site.py"))
     ck = _load("check_ai_readiness", os.path.join("geo-visibility", "scripts", "check_ai_readiness.py"))
+    ck.CRAWL_DELAY = 0  # the pause between crawl requests does not change what is found
     server = demo.serve_in_background(port)
     actual = server.server_address[1]
     try:
         res = ck.check(f"http://127.0.0.1:{actual}", PATHS)
+        crawled = ck.check(f"http://127.0.0.1:{actual}", PATHS, crawl=CRAWL_BUDGET)
     finally:
         server.shutdown()
         server.server_close()
     output = ck.to_markdown(res, issues_only=True).replace(f"127.0.0.1:{actual}", f"127.0.0.1:{demo.PORT}")
     table, _ = words_table(res["findings"])
+    crawl_rows = "\n".join(f"| {f['check']} | {f['status']} | {ck._cell(f['detail'])} |" for f in crawled["findings"] if f["area"] == "links")
+    crawl_rows = crawl_rows.replace(f"127.0.0.1:{actual}", f"127.0.0.1:{demo.PORT}")
+    cs = crawled["scores"]
     paths = " ".join(PATHS)
     return f"""# Demo: the readiness checker on a deliberately flawed site
 
@@ -79,6 +85,20 @@ The checker fetches every `--paths` page as a browser, as GPTBot, as two user-fe
 
 {table}
 
+## Crawl mode: what `--crawl` adds
+
+The links between the demo's pages are planted too. One more flag makes the checker follow them, as Googlebot, in at most {CRAWL_BUDGET} requests (what a bare `--crawl` allows; this run used {crawled["crawl"]["requests"]}):
+
+```bash
+python3 geo-visibility/scripts/check_ai_readiness.py http://127.0.0.1:{demo.PORT} --paths {paths} --crawl --issues-only
+```
+
+Everything it adds is in the `links` area of the same report, and each crawl check is scored once like any other, so the score line becomes **{cs["technical_readiness_pct"]}%** ({cs["fail_count"]} failures, {cs["warn_count"]} warnings). These rows are copied from that run's JSON output:
+
+| Check | Status | Detail |
+|---|---|---|
+{crawl_rows}
+
 ## What was planted, and where the checker found it
 
 | Planted flaw | Where it shows up |
@@ -95,6 +115,11 @@ The checker fetches every `--paths` page as a browser, as GPTBot, as two user-fe
 | The homepage lists a German version at `/de`, and `/de` does not link back (hreflang) | Must fix #7, found by fetching the alternate |
 | `/features` is a shell for a default fetch but full HTML for crawlers | Not a problem: the checker credits it as dynamic rendering by user agent (the pass row hidden by `--issues-only`; note the Default fetch column) |
 | No Bing Webmaster Tools tag, no `llms.txt` | Worth checking |
+| The blog post links to a 2025 comparison page that has been removed | `--crawl`: `broken internal links` (a failure), naming the page that links to it |
+| "Product tour" goes `/product` to `/products` to `/features`, one permanent and one temporary redirect | `--crawl`: `redirect chains` (a warning) |
+| The blog series chains post-1 to post-7, so the last post is eight clicks from the homepage | `--crawl`: `click depth` (information, labelled a rule of thumb) |
+| Two sitemap URLs (post-8 and post-9) have no link pointing at them | `--crawl`: `orphan pages` says **not assessed**, because `/pricing` is a JavaScript shell whose links the crawl cannot see. It declines to guess |
+| A "Staff sign in" link into `/admin/`, and a partner link to another site | `--crawl`: neither is requested; the summary counts them |
 """
 
 
