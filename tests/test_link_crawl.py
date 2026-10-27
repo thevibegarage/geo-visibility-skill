@@ -7,6 +7,7 @@ import contextlib
 import io
 import json
 import os
+import re
 import sys
 import tempfile
 import unittest
@@ -117,6 +118,18 @@ class ExtractLinks(unittest.TestCase):
     def test_things_that_are_not_links_are_ignored(self):
         got = lc.extract_links(html("mailto:a@b.com", "tel:1", "javascript:go()", "#top", "", "b", self.PAGE, self.PAGE + "#x", "/real"), self.PAGE)
         self.assertEqual(got, ["https://example.com/real"])  # also not the page itself, with or without a fragment
+
+    def test_a_scheme_is_judged_before_the_link_is_joined_to_the_page(self):
+        """Python 3.8's urljoin reads "tel:5551234" as a relative path, because digits after a colon look like a port. CI found that
+        on 3.8; this simulates it on any version, so the crawler cannot turn a phone link into a request for /a/tel:5551234."""
+        real = lc.urljoin
+
+        def py38_urljoin(base, href):
+            return real(base, "./" + href) if re.match(r"^[A-Za-z][A-Za-z0-9+.-]*:\d+$", href) else real(base, href)
+
+        with mock.patch.object(lc, "urljoin", py38_urljoin):
+            got = lc.extract_links(html("tel:5551234567", "sms:12345", "whatsapp:1", "mailto:a@b.com", "javascript:void(0)", "/real"), self.PAGE)
+        self.assertEqual(got, ["https://example.com/real"])
 
     def test_base_href_is_honoured(self):
         page = '<html><head><base href="/docs/"></head><body><a href="intro">x</a><a href="/top">y</a></body></html>'

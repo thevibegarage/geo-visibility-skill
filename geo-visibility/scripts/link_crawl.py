@@ -10,6 +10,7 @@ affected check says "not assessed" instead of guessing.
 
 `check_ai_readiness.py` supplies the network function and turns `findings()` into report rows.
 """
+import re
 import time
 from collections import deque
 from html.parser import HTMLParser
@@ -31,6 +32,7 @@ SUMMARY, BROKEN, CHAINS, SINGLE_REDIRECTS, DEPTH, ORPHANS = (
     "internal link crawl", "broken internal links", "redirect chains", "internal links to redirecting URLs", "click depth",
     "orphan pages")
 
+_SCHEME = re.compile(r"^([A-Za-z][A-Za-z0-9+.-]*):")
 _SAFE_PATH = "/%:@!$&'()*+,;=-._~"
 _SAFE_QUERY = _SAFE_PATH + "?"
 
@@ -62,8 +64,14 @@ def normalize(url):
 
 
 def _join(base, href):
+    """href resolved against base and normalized, or None. A scheme other than http(s) is rejected before joining: Python 3.8's
+    urljoin reads "tel:5551234" as a relative path (digits after a colon look like a port), which would become a request."""
+    href = href.strip()
+    scheme = _SCHEME.match(href)
+    if scheme and scheme.group(1).lower() not in ("http", "https"):
+        return None
     try:
-        return normalize(urljoin(base, href.strip()))
+        return normalize(urljoin(base, href))
     except ValueError:
         return None
 
