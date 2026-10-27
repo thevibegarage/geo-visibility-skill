@@ -259,6 +259,14 @@ class Workflows(unittest.TestCase):
         self.assertIn("--issues-only", run)
         self.assertIn("--indexnow-key", run)
 
+    def test_the_test_runner_is_pinned_while_python_38_is_in_the_matrix(self):
+        """`ubuntu-latest` moves; a newer image can lack a Python 3.8 build, and one failed matrix job cancels the others."""
+        job = self.load("tests.yml")["jobs"]["test"]
+        versions = [str(v) for v in job["strategy"]["matrix"]["python-version"]]
+        self.assertIn("3.8", versions)  # the scripts promise Python 3.8 compatibility
+        self.assertNotEqual(job["runs-on"], "ubuntu-latest")
+        self.assertRegex(job["runs-on"], r"^ubuntu-(20\.04|22\.04|24\.04)$")  # images that have a Python 3.8 build
+
     def test_tests_workflow_runs_the_suite(self):
         steps = self.load("tests.yml")["jobs"]["test"]["steps"]
         self.assertTrue(any("unittest discover -s tests" in s.get("run", "") for s in steps))
