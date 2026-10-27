@@ -11,6 +11,8 @@
 #    HTTP 403" and stops rather than producing fake findings; allowlist the runner or use a self-hosted one.
 #  * The run fails when a check fails (a refused AI crawler, missing sitemap, noindex...), when the
 #    site is unreachable and when the homepage returns an HTTP error.
+#  * Until GEO_DOMAIN is set, the Monday run skips itself (green, with a note in the run summary)
+#    instead of failing every week. A manual "Run workflow" with no domain still fails, because you asked for a check.
 
 name: AI Readiness Check
 
@@ -37,6 +39,7 @@ jobs:
 
       - name: Run AI readiness check
         env:
+          EVENT_NAME: ${{ github.event_name }}
           DOMAIN: ${{ inputs.domain || vars.GEO_DOMAIN }}
           # Optional: 3-5 representative detail pages, so the check can compare what a browser, a
           # listed crawler, unlisted AI user-fetch agents, Googlebot and Bingbot each receive (set the GEO_PATHS variable).
@@ -47,6 +50,11 @@ jobs:
           # Propagate the script's exit code through `tee` (1 = failed checks, 2 = unreachable, 3 = homepage HTTP error)
           set -o pipefail
           if [ -z "$DOMAIN" ]; then
+            if [ "$EVENT_NAME" = "schedule" ]; then
+              echo "::notice::Skipped: no site to check. Set the GEO_DOMAIN repository variable to enable the weekly check."
+              echo "Skipped: the GEO_DOMAIN repository variable is not set, so there is no site to check. Set it under Settings → Secrets and variables → Actions → Variables to enable the weekly check." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
             echo "::error::Set the GEO_DOMAIN repository variable or pass a domain input."
             exit 1
           fi

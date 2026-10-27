@@ -271,6 +271,55 @@ class Workflows(unittest.TestCase):
         self.assertTrue(any("unittest discover -s tests" in s.get("run", "") for s in steps))
 
 
+@unittest.skipIf(yaml is None, "PyYAML not installed")
+class ReadinessWorkflowWithoutADomain(unittest.TestCase):
+    """The schedule ships enabled, so it fires on this repo and on every fork that never sets GEO_DOMAIN.
+
+    These tests execute the workflow's real `run` block in bash, the way the runner does (`bash -e`).
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        wf = yaml.safe_load(read(ROOT, ".github", "workflows", "ai-readiness.yml"))
+        step = next(s for s in wf["jobs"]["check"]["steps"] if "run" in s)
+        cls.run_block = step["run"]
+        cls.step_env = step["env"]
+
+    def run_step(self, event, domain=""):
+        with tempfile.TemporaryDirectory() as d:
+            os.symlink(SKILL, os.path.join(d, "geo-visibility"))  # the step uses a relative script path and writes readiness.json
+            summary = os.path.join(d, "summary.md")
+            env = dict(os.environ, DOMAIN=domain, PATHS="", INDEXNOW_KEY="", EVENT_NAME=event, GITHUB_STEP_SUMMARY=summary)
+            p = subprocess.run(["bash", "-e", "-c", self.run_block], cwd=d, env=env, capture_output=True, text=True)
+            text = read(summary) if os.path.exists(summary) else ""
+            return p.returncode, p.stdout, text
+
+    def test_the_step_is_told_which_event_started_it(self):
+        self.assertEqual(self.step_env.get("EVENT_NAME"), "${{ github.event_name }}")
+
+    def test_scheduled_run_without_a_domain_skips_instead_of_failing(self):
+        code, out, summary = self.run_step("schedule")
+        self.assertEqual(code, 0, out)
+        self.assertIn("::notice::", out)
+        self.assertIn("GEO_DOMAIN", summary)  # the run summary says why nothing was checked
+
+    def test_manual_run_without_a_domain_still_fails(self):
+        code, out, summary = self.run_step("workflow_dispatch")
+        self.assertEqual(code, 1)
+        self.assertIn("::error::", out)
+        self.assertEqual(summary, "")
+
+    def test_scheduled_run_with_a_domain_still_checks_the_site(self):
+        robots = (200, {"Content-Type": "text/plain"}, "User-agent: OAI-SearchBot\nDisallow: /\n")
+        with good_site() as ok, good_site(extra={"/robots.txt": robots}) as bad:
+            code, out, summary = self.run_step("schedule", ok.base)
+            self.assertEqual(code, 0, out)
+            self.assertNotEqual(summary, "")  # the checker's report reached the run summary
+            self.assertNotIn("GEO_DOMAIN", summary)
+            code, out, _ = self.run_step("schedule", bad.base)
+            self.assertEqual(code, 1, "a real failure must still fail the scheduled run")
+
+
 class WorkflowCommandShape(unittest.TestCase):
     """Run the workflow's pipeline shape in bash: `script ... --fail-on fail | tee` must keep the script's exit code."""
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- **The scheduled AI Readiness Check no longer fails every Monday on repositories that have not set `GEO_DOMAIN`.** The schedule ships enabled, so this repository and every fork or copy failed its weekly run in about 7 seconds with "Set the GEO_DOMAIN repository variable". A scheduled run with no domain now skips, stays green and says why in the run summary; a manual "Run workflow" with no domain still fails, and a scheduled run with a domain still fails on real findings. 4 tests execute the workflow's real shell step to prove all three cases, and the two guards were mutation-checked (370 to 374 tests).
+
 ## v0.3.0 — 2026-10-09
 
 The checker now covers classic SEO (on-page tags, hreflang, URL hygiene) next to AI-crawler readiness, and the skill installs as a Claude Code plugin with four slash commands.
